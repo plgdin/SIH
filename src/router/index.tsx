@@ -56,6 +56,7 @@ import { Home } from '../pages/Home';
 
 // Lazy-loaded Pages
 const Auctions = lazyWithSuspense(() => import('../pages/Auctions').then(m => ({ default: m.Auctions })));
+const ComplianceEngine = lazyWithSuspense(() => import('../pages/ComplianceEngine').then(m => ({ default: m.ComplianceEngine })));
 const Login = lazyWithSuspense(() => import('../pages/Login').then(m => ({ default: m.Login })));
 const Register = lazyWithSuspense(() => import('../pages/Register').then(m => ({ default: m.Register })));
 const ForgotPassword = lazyWithSuspense(() => import('../pages/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
@@ -104,6 +105,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Home /> },
       { path: 'auctions', element: <Auctions /> },
+      { path: 'compliance', element: <ComplianceEngine /> },
       { path: 'auctions/:id', element: <AuctionDetail /> },
       { path: 'contact', element: <Contact /> },
       { path: 'about', element: <About /> },
