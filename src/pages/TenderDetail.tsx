@@ -3,13 +3,12 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   FileText, Download, CheckCircle2, 
-  ArrowRight, Activity, Building, Clock
+  ArrowRight, Activity, Building, Clock, ShieldCheck
 } from 'lucide-react';
 import { tenderService } from '../services/tenderService';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { formatPrice } from '../utils/currency';
-import { TenderSubmissionModal } from '../components/tender/TenderSubmissionModal';
 import type { Tender, TenderDocument } from '../types/database.types';
 import clsx from 'clsx';
 
@@ -94,21 +93,17 @@ export function TenderDetail() {
             </div>
             
             <div className="shrink-0">
-              {hasSubmitted ? (
-                <div className="flex items-center justify-center px-6 py-3 bg-green-50 border border-green-200 text-green-700 rounded-xl font-bold">
-                  <CheckCircle2 className="w-5 h-5 mr-2" />
-                  Successfully Submitted
-                </div>
-              ) : isOpen ? (
-                <button 
-                  onClick={() => isAuthenticated ? setIsModalOpen(true) : navigate('/auth/login', { state: { from: `/tenders/${tender.id}` }})}
+              {isOpen ? (
+                <Link 
+                  to="/compliance"
                   className="w-full md:w-auto flex justify-center items-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-white bg-primary hover:bg-primary-700 shadow-lg shadow-primary/30 transition-all"
                 >
-                  Submit Tender
-                </button>
+                  <ShieldCheck className="w-5 h-5 mr-2" />
+                  Audit Vendor Compliance
+                </Link>
               ) : (
                 <div className="flex items-center justify-center px-6 py-3 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl font-bold">
-                  Submission Closed
+                  Evaluation Closed
                 </div>
               )}
             </div>
@@ -208,8 +203,8 @@ export function TenderDetail() {
                     <div className={clsx("w-3 h-3 rounded-full", isOpen ? "bg-primary animate-pulse" : "bg-green-500")}></div>
                   </div>
                   <div className="pl-6">
-                    <p className="text-sm font-bold text-slate-900">Submission Open</p>
-                    <p className="text-xs text-slate-500">Currently accepting bids</p>
+                    <p className="text-sm font-bold text-slate-900">Scrutiny Active</p>
+                    <p className="text-xs text-slate-500">Statutory verification active</p>
                   </div>
                 </div>
 
@@ -251,15 +246,6 @@ export function TenderDetail() {
 
         </div>
       </div>
-
-      <TenderSubmissionModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        tender={tender}
-        onSuccess={() => {
-          setHasSubmitted(true);
-        }}
-      />
     </div>
   );
 }

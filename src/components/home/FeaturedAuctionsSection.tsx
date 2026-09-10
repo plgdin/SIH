@@ -188,7 +188,7 @@ export function FeaturedAuctionsSection() {
                   
                   <h3 className="text-2xl font-bold mb-3">Unlock Recommended Auctions</h3>
                   <p className="text-slate-400 text-sm mb-8 leading-relaxed">
-                    Join our secure procurement platform to receive personalized asset recommendations, submit bids, and track your watchlists.
+                    Join our secure procurement platform to receive personalized asset recommendations, verify statutory compliance, and track your watchlists.
                   </p>
                   
                   <div className="flex flex-col gap-4">

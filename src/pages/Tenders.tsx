@@ -76,7 +76,7 @@ export function Tenders() {
             Active e-Tenders
           </h1>
           <p className="text-lg text-slate-600">
-            Browse and participate in high-value procurement opportunities. Submit technical and financial bids securely.
+            Browse active procurement opportunities and verify bidder statutory compliance and eligibility requirements.
           </p>
         </div>
 
