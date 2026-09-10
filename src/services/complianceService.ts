@@ -2,8 +2,199 @@ import type {
   BidSubmissionRecord,
   RiskLevel,
   AuditTrailLog,
-  DecisionStatus
+  DecisionStatus,
+  BidderDocument,
+  DocumentQualityStatus,
+  QualityMetric,
+  ExtractionStatus,
+  ExtractedField,
+  AuthoritativeVerificationStatus,
+  ManualReviewStatus,
+  OverallDocumentStatus
 } from '../types/compliance';
+
+export function computeOverallDocumentStatus(
+  quality: DocumentQualityStatus,
+  extraction: ExtractionStatus,
+  authoritative: AuthoritativeVerificationStatus,
+  manualReview: ManualReviewStatus
+): OverallDocumentStatus {
+  if (quality === 'QUALITY_FAILED' || extraction === 'FAILED' || extraction === 'LOW_CONFIDENCE' || manualReview === 'REQUIRED') {
+    return 'ACTION_REQUIRED';
+  }
+  if (authoritative === 'FAILED') {
+    return 'NOT_VERIFIED';
+  }
+  if (authoritative === 'PENDING') {
+    return 'PENDING';
+  }
+  if (authoritative === 'VERIFIED') {
+    return 'VERIFIED';
+  }
+  return 'NOT_VERIFIED';
+}
+
+export function enrichDocument(doc: any): BidderDocument {
+  if (doc.qualityMetrics && doc.extractedFields && doc.authoritativeStatus && doc.overallStatus) {
+    return doc as BidderDocument;
+  }
+
+  const now = doc.uploadedAt || new Date().toISOString();
+  const lowerName = (doc.name || doc.fileName || '').toLowerCase();
+  const isBlurred = lowerName.includes('blur');
+  const isCropped = lowerName.includes('crop') || lowerName.includes('cut');
+
+  let qualityStatus: DocumentQualityStatus = 'QUALITY_PASSED';
+  let blurScore = 88;
+  let sharpnessScore = 85;
+  let readability: 'READABLE' | 'DEGRADED' | 'UNREADABLE' = 'READABLE';
+  let ocrConf = 97;
+  const reasons: string[] = [];
+  let recommendedAction: string | undefined = undefined;
+
+  if (isBlurred) {
+    qualityStatus = 'QUALITY_FAILED';
+    blurScore = 32;
+    sharpnessScore = 25;
+    readability = 'UNREADABLE';
+    ocrConf = 45;
+    reasons.push('Document image is blurred beyond readability threshold');
+    reasons.push('Critical identity / registration numbers illegible');
+    recommendedAction = 'Please upload a crisp, high-resolution scan at 300 DPI.';
+  } else if (isCropped) {
+    qualityStatus = 'QUALITY_WARNING';
+    blurScore = 72;
+    readability = 'DEGRADED';
+    ocrConf = 78;
+    reasons.push('Document perimeter cropped or border truncated');
+    recommendedAction = 'Ensure all 4 corners and official seal are visible.';
+  } else {
+    reasons.push('Resolution satisfies 300 DPI threshold');
+    reasons.push('Sharpness, contrast, and brightness optimal');
+    reasons.push('All statutory text fields clearly legible');
+  }
+
+  const qualityMetrics: QualityMetric = {
+    resolution: '300 DPI (2480x3508)',
+    blurScore,
+    sharpnessScore,
+    brightness: 'OPTIMAL',
+    contrast: 'OPTIMAL',
+    croppingStatus: isCropped ? 'CROPPED' : 'COMPLETE',
+    rotationStatus: 'ALIGNED',
+    obstructionDetected: false,
+    isDamaged: false,
+    readabilityOfRequiredFields: readability,
+    ocrConfidenceScore: ocrConf,
+    documentCompleteness: isCropped ? 'INCOMPLETE' : 'COMPLETE',
+    overallQuality: qualityStatus,
+    reasons,
+    recommendedAction
+  };
+
+  const extractionStatus: ExtractionStatus = qualityStatus === 'QUALITY_FAILED' 
+    ? 'FAILED' 
+    : qualityStatus === 'QUALITY_WARNING' 
+      ? 'LOW_CONFIDENCE' 
+      : 'SUCCESS';
+
+  let provider = 'Central Public Procurement Portal (CPPP)';
+  let refPrefix = 'CPPP-V';
+  let extractedFields: ExtractedField[] = [];
+
+  switch (doc.type) {
+    case 'AADHAAR':
+      provider = 'UIDAI Authorized e-KYC Gateway (Direct API Compliance)';
+      refPrefix = 'UIDAI-AUTH';
+      extractedFields = [
+        { fieldName: 'Signatory Name', extractedValue: 'Authorized Representative', confidence: 98, source: 'OCR', timestamp: now, isVerified: false },
+        { fieldName: 'Aadhaar Number (Masked)', extractedValue: 'XXXX-XXXX-8921', confidence: 99, source: 'OCR', timestamp: now, isVerified: false },
+        { fieldName: 'UIDAI Authentication Mode', extractedValue: 'Demographic + OTP e-KYC', confidence: 96, source: 'OCR', timestamp: now, isVerified: false }
+      ];
+      break;
+    case 'PAN':
+      provider = 'Income Tax Department (NSDL TIN Gateway)';
+      refPrefix = 'NSDL-TIN';
+      extractedFields = [
+        { fieldName: 'PAN Card Number', extractedValue: 'AABCB1234F', confidence: 99, source: 'OCR', timestamp: now, isVerified: false },
+        { fieldName: 'Entity Registered Name', extractedValue: 'BHARAT CLOUD TECH SOLUTIONS PVT LTD', confidence: 98, source: 'OCR', timestamp: now, isVerified: false }
+      ];
+      break;
+    case 'GST':
+      provider = 'GSTN Authorized GSP Portal';
+      refPrefix = 'GSTN-GSP';
+      extractedFields = [
+        { fieldName: 'GSTIN Identifier', extractedValue: '07AABCB1234F1Z5', confidence: 99, source: 'OCR', timestamp: now, isVerified: false },
+        { fieldName: 'Taxpayer Status', extractedValue: 'Active / Regular', confidence: 95, source: 'OCR', timestamp: now, isVerified: false }
+      ];
+      break;
+    case 'UDYAM':
+      provider = 'Ministry of MSME (Udyam National Portal)';
+      refPrefix = 'MSME-UDYAM';
+      extractedFields = [
+        { fieldName: 'Udyam Registration Number', extractedValue: 'UDYAM-DL-01-0029381', confidence: 98, source: 'OCR', timestamp: now, isVerified: false },
+        { fieldName: 'Enterprise Category', extractedValue: 'Medium Enterprise', confidence: 95, source: 'OCR', timestamp: now, isVerified: false }
+      ];
+      break;
+    case 'OEM_AUTH':
+      provider = 'OEM Manufacturer Direct Verification Register';
+      refPrefix = 'OEM-MAF';
+      extractedFields = [
+        { fieldName: 'OEM Partner Name', extractedValue: 'Dell Technologies Enterprise India', confidence: 98, source: 'OCR', timestamp: now, isVerified: false },
+        { fieldName: 'Authorization Certificate No', extractedValue: 'DE-IND-2026-891', confidence: 97, source: 'OCR', timestamp: now, isVerified: false }
+      ];
+      break;
+    case 'MII_DECLARATION':
+      provider = 'DPIIT Make in India Portal';
+      refPrefix = 'DPIIT-MII';
+      extractedFields = [
+        { fieldName: 'Declared Local Content %', extractedValue: '62.5%', confidence: 96, source: 'OCR', timestamp: now, isVerified: false },
+        { fieldName: 'Classification Tier', extractedValue: 'Class-I Local Supplier (>=50%)', confidence: 95, source: 'OCR', timestamp: now, isVerified: false }
+      ];
+      break;
+    case 'TURNOVER_CA':
+      provider = 'ICAI UDIN Verification Portal';
+      refPrefix = 'ICAI-UDIN';
+      extractedFields = [
+        { fieldName: 'ICAI UDIN Number', extractedValue: '25091823AAAAAA1234', confidence: 99, source: 'OCR', timestamp: now, isVerified: false },
+        { fieldName: '3-Year Average Solvency', extractedValue: '₹ 45.8 Cr', confidence: 97, source: 'OCR', timestamp: now, isVerified: false }
+      ];
+      break;
+    default:
+      extractedFields = [
+        { fieldName: 'Document Identifier', extractedValue: doc.name || 'Statutory Filing', confidence: 92, source: 'OCR', timestamp: now, isVerified: false }
+      ];
+  }
+
+  const authoritativeStatus: AuthoritativeVerificationStatus = qualityStatus === 'QUALITY_FAILED'
+    ? 'PENDING'
+    : (doc.digiLockerVerified ? 'VERIFIED' : 'PENDING');
+
+  if (authoritativeStatus === 'VERIFIED') {
+    extractedFields = extractedFields.map(f => ({ ...f, isVerified: true }));
+  }
+
+  const manualReviewStatus: ManualReviewStatus = qualityStatus === 'QUALITY_WARNING' || authoritativeStatus === 'PENDING'
+    ? 'REQUIRED'
+    : 'NOT_REQUIRED';
+
+  const overallStatus = computeOverallDocumentStatus(qualityStatus, extractionStatus, authoritativeStatus, manualReviewStatus);
+
+  return {
+    ...doc,
+    qualityStatus,
+    qualityMetrics,
+    extractionStatus,
+    extractedFields,
+    authoritativeStatus,
+    authoritativeProvider: provider,
+    authoritativeVerifiedAt: authoritativeStatus === 'VERIFIED' ? now : undefined,
+    authoritativeRefId: `${refPrefix}-${Math.floor(100000 + Math.random() * 900000)}`,
+    manualReviewStatus,
+    manualReviewReason: manualReviewStatus === 'REQUIRED' ? 'Requires human officer sign-off due to scanned document or edge warnings' : undefined,
+    overallStatus
+  };
+}
 
 const STORAGE_KEY = 'lelam_compliance_records_v1';
 
@@ -673,12 +864,19 @@ class ComplianceService {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
       if (data) {
-        return JSON.parse(data);
+        const parsed: BidSubmissionRecord[] = JSON.parse(data);
+        return parsed.map(b => ({
+          ...b,
+          documents: (b.documents || []).map(d => enrichDocument(d))
+        }));
       }
     } catch {
       // Fallback
     }
-    return INITIAL_BIDS;
+    return INITIAL_BIDS.map(b => ({
+      ...b,
+      documents: (b.documents || []).map(d => enrichDocument(d))
+    }));
   }
 
   private saveStoredRecords(records: BidSubmissionRecord[]) {
@@ -1029,7 +1227,8 @@ class ComplianceService {
     fileSize: string,
     docType: 'PAN' | 'GST' | 'UDYAM' | 'OEM_AUTH' | 'MII_DECLARATION' | 'TURNOVER_CA' | 'TECHNICAL_SPEC' | 'AADHAAR',
     rawText: string,
-    sha256Hash: string
+    sha256Hash: string,
+    metadataOverrides?: Partial<BidderDocument>
   ): BidSubmissionRecord {
     const records = this.getStoredRecords();
     const index = records.findIndex(b => b.id === bidId);
@@ -1037,7 +1236,7 @@ class ComplianceService {
 
     const now = new Date().toISOString();
     const newDocId = `DOC-${Date.now()}`;
-    const newDoc = {
+    const baseDoc = {
       id: newDocId,
       name: `${docType.replace(/_/g, ' ')} Document`,
       type: docType,
@@ -1046,8 +1245,11 @@ class ComplianceService {
       uploadedAt: now,
       docHash: sha256Hash.substring(0, 16) + '...',
       digiLockerVerified: true,
-      rawTextPreview: rawText
+      rawTextPreview: rawText,
+      ...metadataOverrides
     };
+
+    const newDoc = enrichDocument(baseDoc);
 
     const newAuditLog: AuditTrailLog = {
       id: `LOG-UP-${Date.now()}`,
@@ -1056,7 +1258,7 @@ class ComplianceService {
       timestamp: now,
       actor: 'AI_DOCUMENT_ENGINE',
       action: `Uploaded & ingested tender document: ${fileName}`,
-      details: `File size: ${fileSize}. SHA-256 registered in session tree.`,
+      details: `File size: ${fileSize}. Quality Status: ${newDoc.qualityStatus}. Authoritative Status: ${newDoc.authoritativeStatus}. Overall: ${newDoc.overallStatus}.`,
       sha256Hash
     };
 

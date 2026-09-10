@@ -4,6 +4,39 @@ export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ComplianceStatus = 'COMPLIANT' | 'NEEDS_REVIEW' | 'NON_COMPLIANT';
 export type DecisionStatus = 'PENDING' | 'APPROVED' | 'DISQUALIFIED';
 
+export type DocumentQualityStatus = 'QUALITY_PASSED' | 'QUALITY_WARNING' | 'QUALITY_FAILED';
+export type ExtractionStatus = 'SUCCESS' | 'LOW_CONFIDENCE' | 'FAILED';
+export type AuthoritativeVerificationStatus = 'VERIFIED' | 'FAILED' | 'PENDING' | 'NOT_CONFIGURED' | 'PROVIDER_UNAVAILABLE';
+export type ManualReviewStatus = 'NOT_REQUIRED' | 'REQUIRED' | 'COMPLETED';
+export type OverallDocumentStatus = 'VERIFIED' | 'NOT_VERIFIED' | 'ACTION_REQUIRED' | 'PENDING';
+
+export interface QualityMetric {
+  resolution: string; // e.g., "300 DPI (2480x3508)"
+  blurScore: number; // 0 - 100 (>70 is good)
+  sharpnessScore: number; // 0 - 100
+  brightness: 'OPTIMAL' | 'TOO_DARK' | 'OVEREXPOSED';
+  contrast: 'OPTIMAL' | 'LOW_CONTRAST';
+  croppingStatus: 'COMPLETE' | 'CROPPED' | 'EDGES_CLIPPED';
+  rotationStatus: 'ALIGNED' | 'ROTATED_90' | 'ROTATED_SKEWED';
+  obstructionDetected: boolean;
+  isDamaged: boolean;
+  readabilityOfRequiredFields: 'READABLE' | 'DEGRADED' | 'UNREADABLE';
+  ocrConfidenceScore: number;
+  documentCompleteness: 'COMPLETE' | 'MISSING_PAGES' | 'INCOMPLETE';
+  overallQuality: DocumentQualityStatus;
+  reasons: string[];
+  recommendedAction?: string;
+}
+
+export interface ExtractedField {
+  fieldName: string;
+  extractedValue: string;
+  confidence: number; // percentage e.g. 97
+  source: 'OCR' | 'DIGITAL_PDF' | 'MANUAL_ENTRY';
+  timestamp: string;
+  isVerified: boolean; // Remains false (UNVERIFIED) until authoritative verification passes
+}
+
 export interface BidderDocument {
   id: string;
   name: string;
@@ -11,9 +44,24 @@ export interface BidderDocument {
   fileName: string;
   fileSize: string;
   uploadedAt: string;
-  docHash: string;
+  docHash: string; // Cryptographic SHA-256 for integrity (NOT proof of authenticity)
   digiLockerVerified: boolean;
   rawTextPreview?: string;
+  
+  // Independent Separated States
+  qualityStatus: DocumentQualityStatus;
+  qualityMetrics: QualityMetric;
+  extractionStatus: ExtractionStatus;
+  extractedFields: ExtractedField[];
+  authoritativeStatus: AuthoritativeVerificationStatus;
+  authoritativeProvider: string; // e.g., "UIDAI Authorized e-KYC Gateway", "GSTN Authorized GSP Portal"
+  authoritativeVerifiedAt?: string;
+  authoritativeRefId?: string;
+  manualReviewStatus: ManualReviewStatus;
+  manualReviewReason?: string;
+  
+  // Derived Overall Status
+  overallStatus: OverallDocumentStatus;
 }
 
 export interface ExtractedBidderData {

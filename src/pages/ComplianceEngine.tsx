@@ -2,10 +2,20 @@ import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, AlertTriangle, XCircle, CheckCircle2, FileText,
   Building2, Cpu, Database, Award, Scale, UserCheck, RefreshCw,
-  PlusCircle, Download, ArrowRight, Activity, Clock, UploadCloud, Trash2
+  PlusCircle, Download, ArrowRight, Activity, Clock, UploadCloud, Trash2,
+  Eye, Check, Info, HelpCircle, X
 } from 'lucide-react';
 import { complianceService } from '../services/complianceService';
-import type { BidSubmissionRecord, DecisionStatus, RiskLevel } from '../types/compliance';
+import type {
+  BidSubmissionRecord,
+  DecisionStatus,
+  RiskLevel,
+  BidderDocument,
+  DocumentQualityStatus,
+  ExtractionStatus,
+  AuthoritativeVerificationStatus,
+  OverallDocumentStatus
+} from '../types/compliance';
 import { toast } from 'react-hot-toast';
 
 export const ComplianceEngine: React.FC = () => {
@@ -15,6 +25,7 @@ export const ComplianceEngine: React.FC = () => {
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [selectedDocType, setSelectedDocType] = useState<'PAN' | 'GST' | 'UDYAM' | 'OEM_AUTH' | 'MII_DECLARATION' | 'TURNOVER_CA' | 'AADHAAR'>('AADHAAR');
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [inspectingDoc, setInspectingDoc] = useState<BidderDocument | null>(null);
 
   // Decision state
   const [officerName, setOfficerName] = useState<string>('Deputy Director (Procurement)');
@@ -70,22 +81,73 @@ export const ComplianceEngine: React.FC = () => {
     }
 
     let rawText = `Scanned PDF: ${file.name} | Verified under ${selectedDocType} classification.`;
+    let qualityData: any = null;
+    let extractionData: any = null;
+    let authoritativeData: any = null;
+
     try {
-      const res = await fetch('/api/compliance?action=extract', {
+      const qRes = await fetch('/api/compliance?action=quality-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentName: file.name,
+          fileSize: fileSizeStr,
+          docType: selectedDocType
+        })
+      });
+      const qJson = await qRes.json();
+      if (qJson.success) qualityData = qJson.data;
+    } catch {}
+
+    try {
+      const eRes = await fetch('/api/compliance?action=extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           documentName: file.name,
           rawText: `${file.name} document for ${currentBid.bidderName}`,
-          companyName: currentBid.bidderName
+          companyName: currentBid.bidderName,
+          docType: selectedDocType
         })
       });
-      const data = await res.json();
-      if (data.success && data.data?.sha256Checksum) {
-        sha256Hash = data.data.sha256Checksum;
+      const eJson = await eRes.json();
+      if (eJson.success) {
+        extractionData = eJson.data;
+        if (eJson.data?.sha256Checksum) {
+          sha256Hash = eJson.data.sha256Checksum;
+        }
       }
-    } catch {
-      // Safe fallback
+    } catch {}
+
+    try {
+      const vRes = await fetch('/api/compliance?action=authoritative-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          docType: selectedDocType,
+          companyName: currentBid.bidderName,
+          qualityStatus: qualityData?.qualityStatus || 'QUALITY_PASSED',
+          extractionStatus: extractionData?.extractionStatus || 'SUCCESS'
+        })
+      });
+      const vJson = await vRes.json();
+      if (vJson.success) authoritativeData = vJson.data;
+    } catch {}
+
+    const metadataOverrides: Partial<BidderDocument> = {};
+    if (qualityData) {
+      metadataOverrides.qualityStatus = qualityData.qualityStatus;
+      metadataOverrides.qualityMetrics = qualityData.qualityMetrics;
+    }
+    if (extractionData) {
+      metadataOverrides.extractionStatus = extractionData.extractionStatus;
+      metadataOverrides.extractedFields = extractionData.extractedFields;
+    }
+    if (authoritativeData) {
+      metadataOverrides.authoritativeStatus = authoritativeData.authoritativeStatus;
+      metadataOverrides.authoritativeProvider = authoritativeData.authoritativeProvider;
+      metadataOverrides.authoritativeRefId = authoritativeData.authoritativeRefId;
+      metadataOverrides.overallStatus = authoritativeData.overallStatus;
     }
 
     complianceService.addDocumentToBid(
@@ -94,12 +156,13 @@ export const ComplianceEngine: React.FC = () => {
       fileSizeStr,
       selectedDocType,
       rawText,
-      sha256Hash
+      sha256Hash,
+      metadataOverrides
     );
 
     loadBids();
     setIsUploading(false);
-    toast.success(`Uploaded "${file.name}" with verified SHA-256 hash!`);
+    toast.success(`Uploaded "${file.name}" — Quality & Verification evaluated!`);
     e.target.value = '';
   };
 
@@ -201,6 +264,19 @@ export const ComplianceEngine: React.FC = () => {
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-600 border border-rose-500/40"><XCircle className="w-3.5 h-3.5" /> DISQUALIFIED</span>;
       default:
         return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 border border-amber-500/40"><Clock className="w-3.5 h-3.5" /> REVIEW PENDING</span>;
+    }
+  };
+
+  const getOverallDocBadge = (status?: OverallDocumentStatus) => {
+    switch (status) {
+      case 'VERIFIED':
+        return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-300"><CheckCircle2 className="w-3 h-3 text-emerald-600" /> VERIFIED</span>;
+      case 'NOT_VERIFIED':
+        return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-100/90 px-2 py-0.5 rounded-full border border-rose-300"><XCircle className="w-3 h-3 text-rose-600" /> NOT VERIFIED</span>;
+      case 'ACTION_REQUIRED':
+        return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300"><AlertTriangle className="w-3 h-3 text-amber-600" /> ACTION REQUIRED</span>;
+      default:
+        return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-100/90 px-2 py-0.5 rounded-full border border-blue-300"><Clock className="w-3 h-3 text-blue-600" /> PENDING</span>;
     }
   };
 
@@ -389,40 +465,49 @@ export const ComplianceEngine: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {currentBid.documents.map((doc) => (
-                  <div key={doc.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col justify-between">
+                  <div key={doc.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all flex flex-col justify-between shadow-2xs hover:shadow-sm">
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
                           {doc.type}
                         </span>
-                        {doc.digiLockerVerified ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3" /> DigiLocker
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                            <AlertTriangle className="w-3 h-3" /> Scanned Copy
-                          </span>
-                        )}
+                        {getOverallDocBadge(doc.overallStatus)}
                       </div>
+
                       <h4 className="text-sm font-bold text-slate-900">{doc.name}</h4>
-                      <p className="text-xs text-slate-500 font-mono mt-1 truncate">{doc.fileName} ({doc.fileSize})</p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5 truncate">{doc.fileName} ({doc.fileSize})</p>
+
+                      {/* 3 Independent Process State Indicators */}
+                      <div className="grid grid-cols-2 gap-1.5 mt-3 pt-2.5 border-t border-slate-200/80 text-[10px]">
+                        <div className="flex items-center justify-between bg-white px-2 py-1 rounded border border-slate-200">
+                          <span className="text-slate-500 font-medium">1. Legibility:</span>
+                          <span className={`font-bold ${doc.qualityStatus === 'QUALITY_PASSED' ? 'text-emerald-700' : doc.qualityStatus === 'QUALITY_WARNING' ? 'text-amber-700' : 'text-rose-700'}`}>
+                            {doc.qualityStatus === 'QUALITY_PASSED' ? 'PASS' : doc.qualityStatus === 'QUALITY_WARNING' ? 'WARN' : 'FAIL'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between bg-white px-2 py-1 rounded border border-slate-200">
+                          <span className="text-slate-500 font-medium">2. OCR Extraction:</span>
+                          <span className={`font-bold ${doc.extractionStatus === 'SUCCESS' ? 'text-purple-700' : 'text-amber-700'}`}>
+                            {doc.extractionStatus === 'SUCCESS' ? 'PASS' : 'LOW CONF'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between bg-white px-2 py-1 rounded border border-slate-200 col-span-2">
+                          <span className="text-slate-500 font-medium truncate mr-1">3. Authoritative:</span>
+                          <span className={`font-bold shrink-0 ${doc.authoritativeStatus === 'VERIFIED' ? 'text-emerald-700' : doc.authoritativeStatus === 'FAILED' ? 'text-rose-700' : 'text-blue-700'}`}>
+                            {doc.authoritativeStatus}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    {doc.rawTextPreview && (
-                      <div className="mt-3 p-2.5 rounded-xl bg-slate-100 border border-slate-200/80 text-[11px] font-mono text-slate-600 line-clamp-2">
-                        {doc.rawTextPreview}
-                      </div>
-                    )}
-
                     <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500">
-                      <span className="font-mono truncate max-w-[110px]" title={doc.docHash}>Hash: {doc.docHash}</span>
+                      <span className="font-mono truncate max-w-[90px]" title={doc.docHash}>Hash: {doc.docHash}</span>
                       <div className="flex items-center gap-2">
                         <button 
-                          onClick={() => toast(`Raw text preview: ${doc.rawTextPreview || 'No text extracted'}`)}
-                          className="text-primary hover:underline font-semibold cursor-pointer"
+                          onClick={() => setInspectingDoc(doc)}
+                          className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                         >
-                          Inspect
+                          <Eye className="w-3 h-3" /> Inspect Dossier
                         </button>
                         <button 
                           onClick={() => handleRemoveDocument(doc.id, doc.name)}
@@ -1202,6 +1287,226 @@ export const ComplianceEngine: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* INSPECT DOCUMENT DOSSIER MODAL */}
+      {inspectingDoc && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 my-8 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800">
+                    {inspectingDoc.type}
+                  </span>
+                  <span className="text-xs text-slate-400">|</span>
+                  <span className="text-xs font-medium text-slate-500 font-mono">{inspectingDoc.fileName} ({inspectingDoc.fileSize})</span>
+                </div>
+                <h3 className="text-xl font-black text-slate-900 mt-1">{inspectingDoc.name}</h3>
+              </div>
+              <button
+                onClick={() => setInspectingDoc(null)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Overall Status Banner */}
+            <div className="mt-5 p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Calculated Final State</div>
+                <div className="text-lg font-black mt-0.5 flex items-center gap-2">
+                  Overall Verdict: 
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase ${
+                    inspectingDoc.overallStatus === 'VERIFIED' ? 'bg-emerald-500 text-white' :
+                    inspectingDoc.overallStatus === 'NOT_VERIFIED' ? 'bg-rose-500 text-white' :
+                    inspectingDoc.overallStatus === 'ACTION_REQUIRED' ? 'bg-amber-500 text-slate-950' : 'bg-blue-500 text-white'
+                  }`}>
+                    {inspectingDoc.overallStatus}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-right text-xs">
+                  <div className="text-slate-400">Manual Review</div>
+                  <div className="font-bold text-amber-300">{inspectingDoc.manualReviewStatus}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* CRITICAL VERIFICATION PRINCIPLES CALLOUT */}
+            <div className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-950 text-xs">
+              <div className="flex items-center gap-2 font-bold text-amber-900 mb-1">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Critical Statutory Compliance Principles</span>
+              </div>
+              <ul className="list-disc pl-5 space-y-0.5 text-amber-900/90 text-[11px]">
+                <li>A high-quality image is <strong>NOT</strong> proof of authenticity.</li>
+                <li>Successful OCR extraction is <strong>NOT</strong> proof of authenticity.</li>
+                <li>Correct PAN/GST/Aadhaar syntax format is <strong>NOT</strong> proof of authenticity.</li>
+                <li>SHA-256 hash guarantees file transmission integrity; it is <strong>NOT</strong> proof of authenticity.</li>
+                <li>Only authoritative verification against authorized statutory gateways (UIDAI / GSTN / NSDL / MSME) establishes validity.</li>
+              </ul>
+            </div>
+
+            {/* PROCESS 1: DOCUMENT LEGIBILITY / QUALITY ENGINE */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                  <h4 className="text-sm font-extrabold text-slate-900">Document Legibility & Quality Engine</h4>
+                </div>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                  inspectingDoc.qualityStatus === 'QUALITY_PASSED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                  inspectingDoc.qualityStatus === 'QUALITY_WARNING' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                  'bg-rose-100 text-rose-800 border border-rose-300'
+                }`}>
+                  {inspectingDoc.qualityStatus}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[10px] uppercase text-slate-400 font-semibold">Resolution</div>
+                  <div className="text-xs font-bold text-slate-800 mt-0.5">{inspectingDoc.qualityMetrics.resolution}</div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[10px] uppercase text-slate-400 font-semibold">Sharpness Score</div>
+                  <div className="text-xs font-bold text-slate-800 mt-0.5">{inspectingDoc.qualityMetrics.sharpnessScore} / 100</div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[10px] uppercase text-slate-400 font-semibold">Blur Detection</div>
+                  <div className="text-xs font-bold text-slate-800 mt-0.5">{inspectingDoc.qualityMetrics.blurScore} / 100</div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[10px] uppercase text-slate-400 font-semibold">Cropping & Borders</div>
+                  <div className="text-xs font-bold text-slate-800 mt-0.5">{inspectingDoc.qualityMetrics.croppingStatus}</div>
+                </div>
+              </div>
+
+              {/* Reasons & Actions */}
+              <div className="mt-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                <div className="font-bold text-slate-700 mb-1">Quality Assessment Analysis:</div>
+                <ul className="list-disc pl-5 space-y-0.5 text-slate-600 text-[11px]">
+                  {inspectingDoc.qualityMetrics.reasons.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+                {inspectingDoc.qualityMetrics.recommendedAction && (
+                  <div className="mt-2 pt-2 border-t border-slate-200 text-slate-700 text-[11px]">
+                    <strong>Recommended Action:</strong> {inspectingDoc.qualityMetrics.recommendedAction}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* PROCESS 2: DOCUMENT EXTRACTION (OCR / NLP) */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                  <h4 className="text-sm font-extrabold text-slate-900">Document Data Extraction (OCR)</h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 font-medium">Confidence: {inspectingDoc.qualityMetrics.ocrConfidenceScore}%</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    inspectingDoc.extractionStatus === 'SUCCESS' ? 'bg-purple-100 text-purple-800 border border-purple-300' :
+                    'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}>
+                    {inspectingDoc.extractionStatus}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-600 uppercase text-[10px] font-bold">
+                      <th className="p-2.5 rounded-l-lg">Field Name</th>
+                      <th className="p-2.5">Extracted Value</th>
+                      <th className="p-2.5">OCR Confidence</th>
+                      <th className="p-2.5">Source</th>
+                      <th className="p-2.5 rounded-r-lg">Field State</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono">
+                    {inspectingDoc.extractedFields.map((field, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="p-2.5 font-semibold text-slate-800">{field.fieldName}</td>
+                        <td className="p-2.5 text-slate-900 font-bold">{field.extractedValue}</td>
+                        <td className="p-2.5 text-slate-600">{field.confidence}%</td>
+                        <td className="p-2.5 text-slate-500">{field.source}</td>
+                        <td className="p-2.5">
+                          {field.isVerified ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3" /> VERIFIED
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              <Clock className="w-3 h-3" /> UNVERIFIED
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-2 italic">
+                * Note: OCR output is strictly marked UNVERIFIED until authoritative validation confirms data integrity.
+              </div>
+            </div>
+
+            {/* PROCESS 3: AUTHORITATIVE VERIFICATION */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+                  <h4 className="text-sm font-extrabold text-slate-900">Authoritative Verification Gateway</h4>
+                </div>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                  inspectingDoc.authoritativeStatus === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                  inspectingDoc.authoritativeStatus === 'FAILED' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
+                  'bg-blue-100 text-blue-800 border border-blue-300'
+                }`}>
+                  {inspectingDoc.authoritativeStatus}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div className="text-[10px] uppercase text-slate-400 font-semibold">Authorized Provider</div>
+                  <div className="font-bold text-slate-900 mt-0.5 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    {inspectingDoc.authoritativeProvider}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Direct authorized compliance mechanism (No scraping / No restricted DB bypass).</div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div className="text-[10px] uppercase text-slate-400 font-semibold">Gateway Audit Reference</div>
+                  <div className="font-mono font-bold text-slate-900 mt-0.5">{inspectingDoc.authoritativeRefId || 'N/A'}</div>
+                  <div className="text-[11px] text-slate-500 mt-1">Verified: {new Date(inspectingDoc.authoritativeVerifiedAt || inspectingDoc.uploadedAt).toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cryptographic Proof & Footer */}
+            <div className="mt-6 pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="font-mono text-slate-500 text-[11px]">
+                <span className="font-semibold text-slate-700">SHA-256 Digest:</span> {inspectingDoc.docHash}
+              </div>
+              <button
+                onClick={() => setInspectingDoc(null)}
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer shadow-md transition-all text-xs"
+              >
+                Close Dossier
+              </button>
+            </div>
           </div>
         </div>
       )}
