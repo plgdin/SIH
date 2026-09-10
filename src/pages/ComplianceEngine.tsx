@@ -3,7 +3,7 @@ import {
   ShieldCheck, AlertTriangle, XCircle, CheckCircle2, FileText,
   Building2, Cpu, Database, Award, Scale, UserCheck, RefreshCw,
   PlusCircle, Download, ArrowRight, Activity, Clock, UploadCloud, Trash2,
-  Eye, Check, Info, HelpCircle, X
+  Eye, X
 } from 'lucide-react';
 import { complianceService } from '../services/complianceService';
 import type {
@@ -11,9 +11,6 @@ import type {
   DecisionStatus,
   RiskLevel,
   BidderDocument,
-  DocumentQualityStatus,
-  ExtractionStatus,
-  AuthoritativeVerificationStatus,
   OverallDocumentStatus
 } from '../types/compliance';
 import { toast } from 'react-hot-toast';

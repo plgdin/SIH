@@ -329,43 +329,39 @@ export default async function handler(req: IncomingMessage & { body?: any }, res
       case 'AADHAAR':
         authoritativeProvider = 'UIDAI Authorized e-KYC Gateway (Direct API Compliance)';
         authoritativeRefId = `UIDAI-AUTH-${Math.floor(100000 + Math.random() * 900000)}`;
-        authoritativeStatus = 'VERIFIED';
         break;
       case 'PAN':
         authoritativeProvider = 'Income Tax Department (NSDL TIN Gateway)';
         authoritativeRefId = `NSDL-TIN-${Math.floor(100000 + Math.random() * 900000)}`;
-        authoritativeStatus = 'VERIFIED';
         break;
       case 'GST':
         authoritativeProvider = 'GSTN Authorized GSP Portal (GST Suvidha Provider)';
         authoritativeRefId = `GSTN-GSP-${Math.floor(100000 + Math.random() * 900000)}`;
-        authoritativeStatus = 'VERIFIED';
         break;
       case 'UDYAM':
         authoritativeProvider = 'Ministry of MSME (Udyam National Portal)';
         authoritativeRefId = `MSME-API-${Math.floor(100000 + Math.random() * 900000)}`;
-        authoritativeStatus = 'VERIFIED';
         break;
       case 'TURNOVER_CA':
         authoritativeProvider = 'Institute of Chartered Accountants of India (ICAI UDIN Portal)';
         authoritativeRefId = `UDIN-${Math.floor(10000000 + Math.random() * 90000000)}`;
-        authoritativeStatus = 'VERIFIED';
         break;
       case 'OEM_AUTH':
         authoritativeProvider = 'OEM Manufacturer Direct Verification Register';
         authoritativeRefId = `OEM-REG-${Math.floor(10000 + Math.random() * 90000)}`;
-        authoritativeStatus = 'VERIFIED';
         break;
       case 'MII_DECLARATION':
         authoritativeProvider = 'DPIIT Make in India Public Portal';
         authoritativeRefId = `MII-DPIIT-${Math.floor(10000 + Math.random() * 90000)}`;
-        authoritativeStatus = 'VERIFIED';
         break;
       default:
         authoritativeProvider = 'Central Public Procurement Portal (CPPP)';
         authoritativeRefId = `CPPP-V-${Math.floor(10000 + Math.random() * 90000)}`;
-        authoritativeStatus = 'VERIFIED';
         break;
+    }
+
+    if (isFailedSimulated) {
+      authoritativeStatus = 'FAILED';
     }
 
     // Determine Overall Document Status according to matrix
@@ -374,11 +370,12 @@ export default async function handler(req: IncomingMessage & { body?: any }, res
     // 3. If authoritative failed -> NOT_VERIFIED
     // 4. If authoritative verified + quality passed/warning + extraction success -> VERIFIED
     let overallStatus: 'VERIFIED' | 'NOT_VERIFIED' | 'ACTION_REQUIRED' | 'PENDING' = 'VERIFIED';
+    const currentStatus: string = authoritativeStatus;
     if (qualityStatus === 'QUALITY_FAILED' || extractionStatus === 'FAILED' || extractionStatus === 'LOW_CONFIDENCE') {
       overallStatus = 'ACTION_REQUIRED';
-    } else if (authoritativeStatus === 'FAILED') {
+    } else if (currentStatus === 'FAILED') {
       overallStatus = 'NOT_VERIFIED';
-    } else if (authoritativeStatus === 'PENDING') {
+    } else if (currentStatus === 'PENDING') {
       overallStatus = 'PENDING';
     } else {
       overallStatus = 'VERIFIED';

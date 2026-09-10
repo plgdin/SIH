@@ -199,7 +199,7 @@ export function enrichDocument(doc: any): BidderDocument {
 const STORAGE_KEY = 'lelam_compliance_records_v1';
 
 // Seed initial realistic bids
-const INITIAL_BIDS: BidSubmissionRecord[] = [
+const RAW_INITIAL_BIDS: any[] = [
   {
     id: 'BID-2026-0891',
     tenderId: 'GeM/2026/B/89412',
@@ -859,6 +859,11 @@ const INITIAL_BIDS: BidSubmissionRecord[] = [
   }
 ];
 
+const INITIAL_BIDS: BidSubmissionRecord[] = RAW_INITIAL_BIDS.map(b => ({
+  ...b,
+  documents: (b.documents || []).map((d: any) => enrichDocument(d))
+}));
+
 class ComplianceService {
   private getStoredRecords(): BidSubmissionRecord[] {
     try {
@@ -1054,7 +1059,7 @@ class ComplianceService {
           digiLockerVerified: true,
           rawTextPreview: `LOCAL CONTENT SELF DECLARATION: ${makeInIndiaPercentage}%`
         }
-      ],
+      ].map((d: any) => enrichDocument(d)),
       extractedData: {
         companyName,
         panNumber: panNumber.toUpperCase(),
