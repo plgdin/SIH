@@ -1027,7 +1027,7 @@ class ComplianceService {
     bidId: string,
     fileName: string,
     fileSize: string,
-    docType: 'PAN' | 'GST' | 'UDYAM' | 'OEM_AUTH' | 'MII_DECLARATION' | 'TURNOVER_CA' | 'TECHNICAL_SPEC',
+    docType: 'PAN' | 'GST' | 'UDYAM' | 'OEM_AUTH' | 'MII_DECLARATION' | 'TURNOVER_CA' | 'TECHNICAL_SPEC' | 'AADHAAR',
     rawText: string,
     sha256Hash: string
   ): BidSubmissionRecord {

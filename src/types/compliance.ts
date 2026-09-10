@@ -7,7 +7,7 @@ export type DecisionStatus = 'PENDING' | 'APPROVED' | 'DISQUALIFIED';
 export interface BidderDocument {
   id: string;
   name: string;
-  type: 'PAN' | 'GST' | 'UDYAM' | 'OEM_AUTH' | 'MII_DECLARATION' | 'TURNOVER_CA' | 'TECHNICAL_SPEC';
+  type: 'PAN' | 'GST' | 'UDYAM' | 'OEM_AUTH' | 'MII_DECLARATION' | 'TURNOVER_CA' | 'TECHNICAL_SPEC' | 'AADHAAR';
   fileName: string;
   fileSize: string;
   uploadedAt: string;

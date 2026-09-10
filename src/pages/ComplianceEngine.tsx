@@ -13,7 +13,7 @@ export const ComplianceEngine: React.FC = () => {
   const [selectedBidId, setSelectedBidId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<number>(1);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
-  const [selectedDocType, setSelectedDocType] = useState<'PAN' | 'GST' | 'UDYAM' | 'OEM_AUTH' | 'MII_DECLARATION' | 'TURNOVER_CA'>('PAN');
+  const [selectedDocType, setSelectedDocType] = useState<'PAN' | 'GST' | 'UDYAM' | 'OEM_AUTH' | 'MII_DECLARATION' | 'TURNOVER_CA' | 'AADHAAR'>('AADHAAR');
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
   // Decision state
@@ -357,6 +357,7 @@ export const ComplianceEngine: React.FC = () => {
                       onChange={(e) => setSelectedDocType(e.target.value as any)}
                       className="text-xs font-semibold p-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 focus:ring-2 focus:ring-primary/20"
                     >
+                      <option value="AADHAAR">Aadhaar Card (Director / Signatory)</option>
                       <option value="PAN">PAN Card</option>
                       <option value="GST">GST Registration</option>
                       <option value="UDYAM">Udyam MSME</option>
