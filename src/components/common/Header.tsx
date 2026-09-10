@@ -252,6 +252,7 @@ export function Header() {
   const navigation = [
     { name: 'Home', href: '/' },
     { name: 'Auctions', href: '/auctions' },
+    { name: 'Compliance Engine', href: '/compliance' },
     { name: 'News', href: '/news' },
     { name: 'Blog', href: '/blog' },
     { name: 'FAQ', href: '/faq' },

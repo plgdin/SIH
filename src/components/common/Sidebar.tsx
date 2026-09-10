@@ -36,6 +36,7 @@ export function Sidebar() {
     { name: 'Quote Builder', path: '/dashboard/quotes', icon: FileText },
     { name: 'Shipping Requests', path: '/dashboard/shipping-requests', icon: Truck },
     { name: 'Document Vault', path: '/dashboard/documents', icon: FolderLock },
+    { name: 'Compliance Engine', path: '/compliance', icon: ShieldAlert },
     { name: 'Calendar & Alerts', path: '/dashboard/reminders', icon: Calendar },
     { name: 'Personal Vendors', path: '/dashboard/vendors', icon: Users },
     { name: 'Inventory Checklist', path: '/dashboard/inventory', icon: ClipboardCheck },

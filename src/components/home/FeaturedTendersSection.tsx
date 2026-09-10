@@ -75,7 +75,7 @@ export function FeaturedTendersSection() {
                     to={`/tenders/${tender.id}`}
                     className="w-full sm:w-auto inline-flex justify-center items-center px-6 py-2.5 border border-primary text-sm font-bold rounded-xl text-primary bg-transparent hover:bg-primary hover:text-white transition-all duration-300"
                   >
-                    Submit Bid
+                    View Tender
                   </Link>
                 </div>
               </div>
