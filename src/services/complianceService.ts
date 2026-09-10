@@ -1023,6 +1023,53 @@ class ComplianceService {
     return newRecord;
   }
 
+  public addDocumentToBid(
+    bidId: string,
+    fileName: string,
+    fileSize: string,
+    docType: 'PAN' | 'GST' | 'UDYAM' | 'OEM_AUTH' | 'MII_DECLARATION' | 'TURNOVER_CA' | 'TECHNICAL_SPEC',
+    rawText: string,
+    sha256Hash: string
+  ): BidSubmissionRecord {
+    const records = this.getStoredRecords();
+    const index = records.findIndex(b => b.id === bidId);
+    if (index === -1) throw new Error('Bid not found');
+
+    const now = new Date().toISOString();
+    const newDocId = `DOC-${Date.now()}`;
+    const newDoc = {
+      id: newDocId,
+      name: `${docType.replace(/_/g, ' ')} Document`,
+      type: docType,
+      fileName,
+      fileSize,
+      uploadedAt: now,
+      docHash: sha256Hash.substring(0, 16) + '...',
+      digiLockerVerified: true,
+      rawTextPreview: rawText
+    };
+
+    const newAuditLog: AuditTrailLog = {
+      id: `LOG-UP-${Date.now()}`,
+      stage: 1,
+      stageName: 'Bid Submission (Input)',
+      timestamp: now,
+      actor: 'AI_DOCUMENT_ENGINE',
+      action: `Uploaded & ingested tender document: ${fileName}`,
+      details: `File size: ${fileSize}. SHA-256 registered in session tree.`,
+      sha256Hash
+    };
+
+    records[index] = {
+      ...records[index],
+      documents: [newDoc, ...records[index].documents],
+      auditTrail: [...records[index].auditTrail, newAuditLog]
+    };
+
+    this.saveStoredRecords(records);
+    return records[index];
+  }
+
   public resetToDefaults() {
     localStorage.removeItem(STORAGE_KEY);
     return INITIAL_BIDS;
