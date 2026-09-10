@@ -77,7 +77,15 @@ export const ComplianceEngine: React.FC = () => {
         .map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    let rawText = `Scanned PDF: ${file.name} | Verified under ${selectedDocType} classification.`;
+    let rawText = `Scanned PDF: ${file.name} | Category: ${selectedDocType}`;
+    try {
+      // Sample first 4KB of file content to read text signatures
+      const sample = await file.slice(0, 4096).text();
+      if (sample && sample.length > 10) {
+        rawText = `${file.name} ${sample}`;
+      }
+    } catch {}
+
     let qualityData: any = null;
     let extractionData: any = null;
     let authoritativeData: any = null;
@@ -89,11 +97,12 @@ export const ComplianceEngine: React.FC = () => {
         body: JSON.stringify({
           documentName: file.name,
           fileSize: fileSizeStr,
-          docType: selectedDocType
+          docType: selectedDocType,
+          rawText
         })
       });
       const qJson = await qRes.json();
-      if (qJson.success) qualityData = qJson.data;
+      if (qJson.data) qualityData = qJson.data;
     } catch {}
 
     try {
@@ -102,19 +111,21 @@ export const ComplianceEngine: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           documentName: file.name,
-          rawText: `${file.name} document for ${currentBid.bidderName}`,
+          rawText: `${file.name} document for ${currentBid.bidderName} ${rawText}`,
           companyName: currentBid.bidderName,
           docType: selectedDocType
         })
       });
       const eJson = await eRes.json();
-      if (eJson.success) {
+      if (eJson.data) {
         extractionData = eJson.data;
         if (eJson.data?.sha256Checksum) {
           sha256Hash = eJson.data.sha256Checksum;
         }
       }
     } catch {}
+
+    const isMismatch = extractionData?.classification?.isMismatch || qualityData?.classification?.isMismatch || false;
 
     try {
       const vRes = await fetch('/api/compliance?action=authoritative-verify', {
@@ -123,28 +134,32 @@ export const ComplianceEngine: React.FC = () => {
         body: JSON.stringify({
           docType: selectedDocType,
           companyName: currentBid.bidderName,
-          qualityStatus: qualityData?.qualityStatus || 'QUALITY_PASSED',
-          extractionStatus: extractionData?.extractionStatus || 'SUCCESS'
+          qualityStatus: isMismatch ? 'QUALITY_FAILED' : (qualityData?.qualityStatus || 'QUALITY_PASSED'),
+          extractionStatus: isMismatch ? 'FAILED' : (extractionData?.extractionStatus || 'SUCCESS'),
+          isMismatch
         })
       });
       const vJson = await vRes.json();
-      if (vJson.success) authoritativeData = vJson.data;
+      if (vJson.data) authoritativeData = vJson.data;
     } catch {}
 
     const metadataOverrides: Partial<BidderDocument> = {};
     if (qualityData) {
-      metadataOverrides.qualityStatus = qualityData.qualityStatus;
+      metadataOverrides.qualityStatus = isMismatch ? 'QUALITY_FAILED' : qualityData.qualityStatus;
       metadataOverrides.qualityMetrics = qualityData.qualityMetrics;
     }
     if (extractionData) {
-      metadataOverrides.extractionStatus = extractionData.extractionStatus;
+      metadataOverrides.extractionStatus = isMismatch ? 'FAILED' : extractionData.extractionStatus;
       metadataOverrides.extractedFields = extractionData.extractedFields;
     }
     if (authoritativeData) {
-      metadataOverrides.authoritativeStatus = authoritativeData.authoritativeStatus;
-      metadataOverrides.authoritativeProvider = authoritativeData.authoritativeProvider;
+      metadataOverrides.authoritativeStatus = isMismatch ? 'FAILED' : authoritativeData.authoritativeStatus;
+      metadataOverrides.authoritativeProvider = isMismatch ? 'AI Classification Guard' : authoritativeData.authoritativeProvider;
       metadataOverrides.authoritativeRefId = authoritativeData.authoritativeRefId;
-      metadataOverrides.overallStatus = authoritativeData.overallStatus;
+      metadataOverrides.overallStatus = isMismatch ? 'ACTION_REQUIRED' : authoritativeData.overallStatus;
+    }
+    if (extractionData?.classification || qualityData?.classification) {
+      metadataOverrides.classification = extractionData?.classification || qualityData?.classification;
     }
 
     complianceService.addDocumentToBid(
@@ -159,7 +174,16 @@ export const ComplianceEngine: React.FC = () => {
 
     loadBids();
     setIsUploading(false);
-    toast.success(`Uploaded "${file.name}" — Quality & Verification evaluated!`);
+
+    if (isMismatch) {
+      const detectedLabel = extractionData?.classification?.detectedLabel || qualityData?.classification?.detectedLabel || 'another statutory category';
+      toast.error(
+        `DECLINED: Selected "${selectedDocType}", but file content identified as "${detectedLabel}"!`,
+        { duration: 8000 }
+      );
+    } else {
+      toast.success(`Uploaded "${file.name}" — Classification & Legibility verified!`);
+    }
     e.target.value = '';
   };
 
@@ -495,6 +519,13 @@ export const ComplianceEngine: React.FC = () => {
                           </span>
                         </div>
                       </div>
+
+                      {doc.classification?.isMismatch && (
+                        <div className="mt-2.5 p-2 rounded-xl bg-rose-50 border border-rose-200 text-[10px] text-rose-700 font-bold flex items-center gap-1.5">
+                          <XCircle className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                          <span className="truncate">DECLINED: Detected {doc.classification.detectedType} (Declared {doc.classification.declaredType})</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500">
@@ -1334,6 +1365,29 @@ export const ComplianceEngine: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* DOCUMENT CLASSIFICATION REJECTION BANNER (IF MISMATCH) */}
+            {inspectingDoc.classification?.isMismatch && (
+              <div className="mt-4 p-4 rounded-2xl bg-rose-600 text-white shadow-lg flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                    <XCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-wide">Document Classification Rejected</h4>
+                    <p className="text-xs text-rose-100 mt-0.5">
+                      Declared: <strong className="underline">{inspectingDoc.classification.declaredType}</strong> | Recognized as: <strong className="underline">{inspectingDoc.classification.detectedType}</strong>
+                    </p>
+                    <p className="text-[11px] text-rose-200 mt-1">
+                      The AI Classification Engine detected that this document does not match the statutory form required. Upload was declined to prevent cross-document fraud.
+                    </p>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-white text-rose-700 text-xs font-extrabold rounded-full shrink-0 shadow">
+                  DECLINED
+                </span>
+              </div>
+            )}
 
             {/* CRITICAL VERIFICATION PRINCIPLES CALLOUT */}
             <div className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-950 text-xs">

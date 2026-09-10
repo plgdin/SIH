@@ -14,6 +14,41 @@ const sendJson = (res: ServerResponse & { status?: (c: number) => any; json?: (d
   res.end(JSON.stringify(body));
 };
 
+export function classifyUploadedDocument(documentName: string, rawText: string): { detectedType: string; confidence: number; label: string } {
+  const haystack = `${documentName} ${rawText}`.toLowerCase();
+  
+  // 1. GST Identification (Keywords or 15-char GSTIN pattern)
+  if (haystack.includes('gst') || haystack.includes('gstin') || haystack.includes('gstr') || /[0-9]{2}[a-z]{5}[0-9]{4}[a-z]{1}[1-9a-z]{1}z[0-9a-z]{1}/i.test(haystack)) {
+    return { detectedType: 'GST', confidence: 98, label: 'GST Registration Certificate (Form REG-06)' };
+  }
+  // 2. PAN Identification (Keywords or 10-char PAN pattern)
+  if (haystack.includes('pan_') || haystack.includes('pan card') || haystack.includes('permanent account number') || haystack.includes('income tax department') || /[a-z]{5}[0-9]{4}[a-z]{1}/i.test(haystack)) {
+    return { detectedType: 'PAN', confidence: 97, label: 'Income Tax PAN Card' };
+  }
+  // 3. Aadhaar Identification
+  if (haystack.includes('aadhar') || haystack.includes('aadhaar') || haystack.includes('uidai') || /[0-9]{4}\s?[0-9]{4}\s?[0-9]{4}/.test(haystack)) {
+    return { detectedType: 'AADHAAR', confidence: 96, label: 'Aadhaar Card (UIDAI Identity)' };
+  }
+  // 4. Udyam MSME
+  if (haystack.includes('udyam') || haystack.includes('msme') || /udyam-[a-z]{2}-[0-9]{2}-[0-9]{7}/i.test(haystack)) {
+    return { detectedType: 'UDYAM', confidence: 97, label: 'Udyam MSME Certificate' };
+  }
+  // 5. OEM MAF
+  if (haystack.includes('oem') || haystack.includes('maf') || haystack.includes('manufacturer authorization') || haystack.includes('dealership')) {
+    return { detectedType: 'OEM_AUTH', confidence: 95, label: 'OEM Authorization Certificate' };
+  }
+  // 6. CA Turnover
+  if (haystack.includes('turnover') || haystack.includes('udin') || haystack.includes('chartered accountant') || haystack.includes('balance sheet') || haystack.includes('solvency')) {
+    return { detectedType: 'TURNOVER_CA', confidence: 96, label: 'CA Audited Turnover Certificate' };
+  }
+  // 7. Make in India
+  if (haystack.includes('mii') || haystack.includes('make in india') || haystack.includes('local content')) {
+    return { detectedType: 'MII_DECLARATION', confidence: 95, label: 'Make In India (MII) Affidavit' };
+  }
+
+  return { detectedType: 'UNKNOWN', confidence: 50, label: 'Unclassified Document' };
+}
+
 export default async function handler(req: IncomingMessage & { body?: any }, res: ServerResponse & { status?: (c: number) => any; json?: (d: any) => any }) {
   const url = new URL(req.url || '', 'http://localhost');
   const action = url.searchParams.get('action') || url.pathname.split('/').pop();
@@ -64,8 +99,10 @@ export default async function handler(req: IncomingMessage & { body?: any }, res
 
   // 2. Action: Legibility and Quality Engine Analysis
   if (req.method === 'POST' && action === 'quality-check') {
-    const { documentName, isSimulatedIssue } = bodyData;
+    const { documentName, isSimulatedIssue, docType, rawText } = bodyData;
     const lowerName = (documentName || '').toLowerCase();
+    const classification = classifyUploadedDocument(documentName || '', rawText || '');
+    const isMismatch = (classification.detectedType !== 'UNKNOWN' && docType && classification.detectedType !== docType);
     
     let blurScore = Math.floor(78 + Math.random() * 20); // 0-100 (>70 is good)
     let sharpnessScore = Math.floor(82 + Math.random() * 16);
@@ -83,7 +120,14 @@ export default async function handler(req: IncomingMessage & { body?: any }, res
     const reasons: string[] = [];
     let recommendedAction = 'Quality checks passed. Proceeding to document extraction.';
 
-    if (isSimulatedIssue === 'BLUR' || lowerName.includes('blur')) {
+    if (isMismatch) {
+      overallQuality = 'QUALITY_FAILED';
+      readabilityOfRequiredFields = 'UNREADABLE';
+      ocrConfidenceScore = 15;
+      reasons.push(`❌ Document Classification Mismatch: Declared as "${docType}", but content recognized as "${classification.label}".`);
+      reasons.push(`Statutory forms must match the declared verification category.`);
+      recommendedAction = `Upload rejected. Please upload the genuine "${docType}" certificate, not "${classification.label}".`;
+    } else if (isSimulatedIssue === 'BLUR' || lowerName.includes('blur')) {
       blurScore = 34;
       sharpnessScore = 28;
       readabilityOfRequiredFields = 'UNREADABLE';
@@ -116,7 +160,7 @@ export default async function handler(req: IncomingMessage & { body?: any }, res
     }
 
     return sendJson(res, 200, {
-      success: true,
+      success: !isMismatch,
       data: {
         documentName: documentName || 'Document.pdf',
         qualityStatus: overallQuality,
@@ -137,6 +181,14 @@ export default async function handler(req: IncomingMessage & { body?: any }, res
           reasons,
           recommendedAction
         },
+        classification: {
+          declaredType: docType,
+          detectedType: classification.detectedType,
+          detectedLabel: classification.label,
+          confidence: classification.confidence,
+          isMismatch,
+          reason: isMismatch ? `Declared ${docType} != Detected ${classification.label}` : undefined
+        },
         disclaimer: 'Quality analysis verifies legibility only and does NOT constitute proof of document authenticity.'
       },
       timestamp: now
@@ -146,6 +198,42 @@ export default async function handler(req: IncomingMessage & { body?: any }, res
   // 3. Action: Extract documents via backend NLP/OCR parser (Each field distinct & marked UNVERIFIED)
   if (req.method === 'POST' && action === 'extract') {
     const { documentName, rawText, companyName, docType } = bodyData;
+    const classification = classifyUploadedDocument(documentName || '', rawText || '');
+    const isMismatch = (classification.detectedType !== 'UNKNOWN' && docType && classification.detectedType !== docType);
+
+    if (isMismatch) {
+      return sendJson(res, 200, {
+        success: false,
+        error: `Document classification mismatch: Declared "${docType}" but identified "${classification.label}".`,
+        data: {
+          documentName: documentName || 'Uploaded_Document.pdf',
+          sha256Checksum: crypto.createHash('sha256').update(rawText || documentName || 'seed').digest('hex'),
+          extractionStatus: 'FAILED',
+          extractedFields: [
+            {
+              fieldName: 'Document Classification Alert',
+              extractedValue: `REJECTED: Declared [${docType}] but content matches [${classification.label}]`,
+              confidence: 0,
+              source: 'OCR',
+              timestamp: now,
+              isVerified: false
+            }
+          ],
+          classification: {
+            declaredType: docType,
+            detectedType: classification.detectedType,
+            detectedLabel: classification.label,
+            confidence: classification.confidence,
+            isMismatch: true,
+            reason: `Declared ${docType} != Detected ${classification.label}`
+          },
+          confidence: 0,
+          processedAt: now,
+          notice: 'REJECTED: Document type mismatch. Verification declined.'
+        },
+        timestamp: now
+      });
+    }
 
     // Backend rule-based entity extraction
     const panMatch = (rawText || '').match(/[A-Z]{5}[0-9]{4}[A-Z]{1}/);
@@ -318,8 +406,23 @@ export default async function handler(req: IncomingMessage & { body?: any }, res
 
   // 4. Action: Authoritative Verification against authorized provider
   if (req.method === 'POST' && action === 'authoritative-verify') {
-    const { docType, qualityStatus, extractionStatus, isFailedSimulated } = bodyData;
+    const { docType, qualityStatus, extractionStatus, isFailedSimulated, isMismatch } = bodyData;
     
+    if (isMismatch) {
+      return sendJson(res, 200, {
+        success: false,
+        data: {
+          authoritativeStatus: 'FAILED',
+          authoritativeProvider: 'AI Document Classification Guard',
+          authoritativeRefId: `DECLINED-MISMATCH-${Date.now()}`,
+          verifiedAt: now,
+          overallStatus: 'ACTION_REQUIRED',
+          flagMessage: 'Verification rejected: Document classification mismatch.'
+        },
+        timestamp: now
+      });
+    }
+
     let authoritativeStatus: 'VERIFIED' | 'FAILED' | 'PENDING' | 'NOT_CONFIGURED' | 'PROVIDER_UNAVAILABLE' = isFailedSimulated ? 'FAILED' : 'VERIFIED';
     let authoritativeProvider = '';
     let authoritativeRefId = '';

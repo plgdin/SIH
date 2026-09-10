@@ -60,6 +60,15 @@ export interface BidderDocument {
   manualReviewStatus: ManualReviewStatus;
   manualReviewReason?: string;
   
+  // AI Document Classification & Mismatch Guard
+  classification?: {
+    declaredType: string;
+    detectedType: string;
+    confidence: number;
+    isMismatch: boolean;
+    reason?: string;
+  };
+
   // Derived Overall Status
   overallStatus: OverallDocumentStatus;
 }
