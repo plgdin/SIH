@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, AlertTriangle, XCircle, CheckCircle2, FileText,
   Building2, Cpu, Database, Award, Scale, UserCheck, RefreshCw,
-  PlusCircle, Search, ExternalLink, ChevronRight, Download, Eye,
-  Lock, ArrowRight, Activity, Clock, Check, AlertCircle, FileCheck
+  PlusCircle, Download, ArrowRight, Activity, Clock
 } from 'lucide-react';
 import { complianceService } from '../services/complianceService';
-import { BidSubmissionRecord, DecisionStatus, RiskLevel } from '../types/compliance';
+import type { BidSubmissionRecord, DecisionStatus, RiskLevel } from '../types/compliance';
 import { toast } from 'react-hot-toast';
 
 export const ComplianceEngine: React.FC = () => {
@@ -14,7 +13,6 @@ export const ComplianceEngine: React.FC = () => {
   const [selectedBidId, setSelectedBidId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<number>(1);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
-  const [simulationProgress, setSimulationProgress] = useState<number>(100);
 
   // Decision state
   const [officerName, setOfficerName] = useState<string>('Deputy Director (Procurement)');
@@ -51,22 +49,20 @@ export const ComplianceEngine: React.FC = () => {
 
   const handleSimulateFullPipeline = () => {
     setIsSimulating(true);
-    setSimulationProgress(14);
     setActiveTab(1);
 
     const steps = [
-      { step: 1, progress: 14, delay: 600 },
-      { step: 2, progress: 28, delay: 1300 },
-      { step: 3, progress: 45, delay: 2100 },
-      { step: 4, progress: 65, delay: 2800 },
-      { step: 5, progress: 85, delay: 3500 },
-      { step: 6, progress: 100, delay: 4200 },
+      { step: 1, delay: 600 },
+      { step: 2, delay: 1300 },
+      { step: 3, delay: 2100 },
+      { step: 4, delay: 2800 },
+      { step: 5, delay: 3500 },
+      { step: 6, delay: 4200 },
     ];
 
-    steps.forEach(({ step, progress, delay }) => {
+    steps.forEach(({ step, delay }) => {
       setTimeout(() => {
         setActiveTab(step);
-        setSimulationProgress(progress);
         if (step === 6) {
           setIsSimulating(false);
           toast.success('7-Stage Compliance Analysis Completed Successfully!');
@@ -107,7 +103,7 @@ export const ComplianceEngine: React.FC = () => {
       return;
     }
 
-    const updated = complianceService.recordDecision(
+    complianceService.recordDecision(
       currentBid.id,
       decisionTypeToConfirm,
       officerName,
@@ -984,27 +980,39 @@ export const ComplianceEngine: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateBid} className="mt-4 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Bidder Company Name</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Tender Title</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Acme Tech Solutions Ltd"
-                    value={newCompany}
-                    onChange={(e) => setNewCompany(e.target.value)}
+                    value={newTenderTitle}
+                    onChange={(e) => setNewTenderTitle(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Tender Estimate (INR)</label>
-                  <input
-                    type="number"
-                    required
-                    value={newTenderValue}
-                    onChange={(e) => setNewTenderValue(Number(e.target.value))}
-                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Bidder Company Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Acme Tech Solutions Ltd"
+                      value={newCompany}
+                      onChange={(e) => setNewCompany(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Tender Estimate (INR)</label>
+                    <input
+                      type="number"
+                      required
+                      value={newTenderValue}
+                      onChange={(e) => setNewTenderValue(Number(e.target.value))}
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
                 </div>
               </div>
 

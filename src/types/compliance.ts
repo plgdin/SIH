@@ -1,3 +1,5 @@
+export const COMPLIANCE_VERSION = '1.0.0';
+
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ComplianceStatus = 'COMPLIANT' | 'NEEDS_REVIEW' | 'NON_COMPLIANT';
 export type DecisionStatus = 'PENDING' | 'APPROVED' | 'DISQUALIFIED';

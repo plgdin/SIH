@@ -1,9 +1,8 @@
-import {
+import type {
   BidSubmissionRecord,
   RiskLevel,
   AuditTrailLog,
-  DecisionStatus,
-  PortalVerificationDetail
+  DecisionStatus
 } from '../types/compliance';
 
 const STORAGE_KEY = 'lelam_compliance_records_v1';
