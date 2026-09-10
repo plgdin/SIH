@@ -63,7 +63,9 @@ const localApiPlugin = () => ({
           pathname === '/api/verify-payment' ||
           pathname === '/api/validate-coupon' ||
           pathname === '/api/send-signup-email' ||
-          pathname === '/api/send-transactional-email'
+          pathname === '/api/send-transactional-email' ||
+          pathname === '/api/compliance' ||
+          pathname.startsWith('/api/compliance/')
         ) {
           // Add Vercel response helper methods
           res.status = (code: number) => {
@@ -107,6 +109,9 @@ const localApiPlugin = () => ({
             pathname === '/api/scraper/unlock-processing'
           ) {
             import('./api/scraper.ts').then((m) => m.default(req, res)).catch(next);
+            return;
+          } else if (pathname === '/api/compliance' || pathname.startsWith('/api/compliance/')) {
+            import('./api/compliance.ts').then((m) => m.default(req, res)).catch(next);
             return;
           }
         }

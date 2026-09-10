@@ -22,21 +22,6 @@ import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { Skeleton } from '../components/ui/skeleton';
 
-// Dynamic script loader for Razorpay SDK
-const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
 
 const loadHtml2PdfScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -365,258 +350,52 @@ export function CheckoutPage() {
 
     setIsProcessing(true);
 
-    const rzpKey = (import.meta.env.VITE_RAZORPAY_KEY_ID || (import.meta.env as any).RAZORPAY_KEY_ID || 'rzp_test_mockkey12345').trim();
-    const isMockMode = rzpKey === 'rzp_test_mockkey12345' || rzpKey.includes('mockkey');
-
-    // If it's a free Explorer setup or using a dummy key, mock activation directly. Trial plans MUST go through Razorpay.
-    if (isExplorerFree || isMockMode) {
-      setTimeout(() => {
-        setIsProcessing(false);
-        setStep('success');
-        setTransactionId(
-          isTrial 
-            ? `TRIAL-30D-${Date.now().toString().slice(-6)}`
-            : `FREE-${Date.now().toString().slice(-6)}`
-        );
-        if (isTrial) {
-          setTrialStartTimestamp(user?.id);
-        }
-        if (user?.id) {
-          const planToSet = (planId === 'pro' || planId === 'premium') ? 'pro' : (planId === 'go' || planId === 'go-subscription') ? 'go' : 'explorer';
-          const durationDays = isTrial ? 30 : (billingCycle === 'annual' ? 365 : 30);
-          const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
-
-          const updates: any = {
-            subscription_plan: planToSet as any,
-            subscription_expires_at: expiresAt
-          };
-          
-          if (isTrial) {
-            updates.trial_claimed = true;
-          }
-
-          authService.updateProfile(user.id, updates).then((updated) => {
-            if (updated) setProfile(updated);
-          });
-        }
-        
-        // Trigger celebratory confetti for trial / free plans
-        confetti({
-          particleCount: 150,
-          spread: 80,
-          origin: { y: 0.6 }
-        });
-
-        import('../services/auditService').then(({ logUserActivity }) => {
-          logUserActivity('checkout_success_free_or_trial', 'payment', planId, {
-            planId,
-            billingCycle,
-            isTrial,
-            couponApplied: appliedDiscount > 0 ? couponCode : undefined,
-            discountPct: appliedDiscount > 0 ? appliedDiscount * 100 : undefined
-          });
-        }).catch(() => {});
-      }, 1500);
-      return;
-    }
-
-    // Load Razorpay Checkout SDK script
-    const scriptLoaded = await loadRazorpayScript();
-    if (!scriptLoaded) {
+    setTimeout(() => {
       setIsProcessing(false);
-      setSdkError('Razorpay Payment Gateway failed to load. Please check your internet connection or adblocker.');
-      return;
-    }
+      setStep('success');
+      const txnId = isTrial 
+        ? `TRIAL-30D-${Date.now().toString().slice(-6)}`
+        : `ACT-${planId.toUpperCase()}-${Date.now().toString().slice(-6)}`;
+      setTransactionId(txnId);
 
-    let orderId = '';
-    let token = '';
+      if (isTrial) {
+        setTrialStartTimestamp(user?.id);
+      }
+      if (user?.id) {
+        const planToSet = (planId === 'pro' || planId === 'premium') ? 'pro' : (planId === 'go' || planId === 'go-subscription') ? 'go' : 'explorer';
+        const durationDays = isTrial ? 30 : (billingCycle === 'annual' ? 365 : 30);
+        const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
 
-    try {
-      const { data } = await supabase.auth.getSession();
-      token = data.session?.access_token || '';
+        const updates: any = {
+          subscription_plan: planToSet as any,
+          subscription_expires_at: expiresAt
+        };
+        
+        if (isTrial) {
+          updates.trial_claimed = true;
+        }
+
+        authService.updateProfile(user.id, updates).then((updated) => {
+          if (updated) setProfile(updated);
+        });
+      }
       
-      const orderResponse = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          amount: total * 100, // paise
-          currency: 'INR',
-          receipt: `rcpt_${Date.now()}`,
+      confetti({
+        particleCount: 150,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
+
+      import('../services/auditService').then(({ logUserActivity }) => {
+        logUserActivity('checkout_success_direct', 'payment', planId, {
           planId,
           billingCycle,
-          couponCode: appliedDiscount > 0 ? appliedCouponCode : undefined,
-          isTrial
-        })
-      });
-
-      const orderData = await orderResponse.json();
-      if (!orderData.success) {
-        setIsProcessing(false);
-        const errStr = orderData.error?.message || orderData.error || 'Failed to create payment order. Please try again.';
-        setSdkError(errStr);
-        return;
-      }
-      orderId = orderData.data.order_id;
-    } catch (err) {
-      setIsProcessing(false);
-      setSdkError('Failed to connect to the billing backend. Please try again.');
-      return;
-    }
-
-    // Configure Razorpay Checkout options
-    const options = {
-      key: rzpKey,
-      name: 'Lelam Company',
-      description: `Lelam ${(planId === 'pro' || planId === 'premium') ? 'Bidder Pro' : (planId === 'go' || planId === 'go-subscription') ? 'Go Subscription' : 'Explorer'} plan (${billingCycle})`,
-      image: window.location.protocol === 'https:' ? '/favicon.svg' : undefined,
-      subscription_id: orderId,
-      config: {
-        display: {
-          blocks: {
-            banks: {
-              name: 'Pay via Card, UPI or Net Banking',
-              instruments: [
-                { method: 'card' },
-                { method: 'upi' },
-                { method: 'netbanking' }
-              ]
-            }
-          },
-          sequence: ['block.banks'],
-          preferences: {
-            show_default_blocks: false
-          }
-        }
-      },
-      handler: async function (response: any) {
-        // Immediately show verifying screen — blocks user from interacting
-        setStep('verifying');
-        setIsProcessing(true);
-        try {
-          const verifyResponse = await fetch('/api/verify-payment', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              order_id: response.razorpay_subscription_id,
-              payment_id: response.razorpay_payment_id,
-              signature: response.razorpay_signature
-            })
-          });
-
-          const verifyData = await verifyResponse.json();
-
-          // Brief delay so user sees the verification animation
-          await new Promise(r => setTimeout(r, 1800));
-
-          if (!verifyData.success) {
-            setIsProcessing(false);
-            const errStr = verifyData.error?.message || verifyData.error || 'Payment signature verification failed.';
-            setSdkError(errStr);
-            setFailureReason(errStr);
-            setTransactionId(response.razorpay_payment_id || `FAIL-${Date.now().toString().slice(-6)}`);
-            setStep('failed');
-            return;
-          }
-
-          setIsProcessing(false);
-          setStep('success');
-          setTransactionId(response.razorpay_payment_id);
-          
-          // Confetti only for paid plan subscriptions
-          confetti({
-            particleCount: 150,
-            spread: 80,
-            origin: { y: 0.6 }
-          });
-
-          if (user?.id) {
-            const durationDays = isTrial ? 30 : (billingCycle === 'annual' ? 365 : 30);
-            const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
-            authService.updateProfile(user.id, { 
-              subscription_plan: planId as any,
-              subscription_expires_at: expiresAt
-            }).then((updated) => {
-              if (updated) setProfile(updated);
-            });
-          }
-
-          import('../services/auditService').then(({ logUserActivity }) => {
-            logUserActivity('checkout_success_razorpay', 'payment', planId, {
-              planId,
-              billingCycle,
-              orderId: response.razorpay_order_id,
-              paymentId: response.razorpay_payment_id,
-              couponApplied: appliedDiscount > 0 ? couponCode : undefined,
-              discountPct: appliedDiscount > 0 ? appliedDiscount * 100 : undefined
-            });
-          }).catch(() => {});
-        } catch (err) {
-          setIsProcessing(false);
-          const errStr = 'An error occurred during payment verification. Please contact support.';
-          setSdkError(errStr);
-          setFailureReason(errStr);
-          setTransactionId(`ERR-${Date.now().toString().slice(-6)}`);
-          setStep('failed');
-          
-          import('../services/auditService').then(({ logUserActivity }) => {
-            logUserActivity('checkout_verification_error', 'payment', planId, {
-              error: err instanceof Error ? err.message : String(err)
-            });
-          }).catch(() => {});
-        }
-      },
-      prefill: {
-        name: fullName,
-        email: user?.email || authEmail || '',
-      },
-      notes: {
-        plan_id: planId,
-        billing_cycle: billingCycle,
-        gstin: gstin || 'None',
-        business_name: businessName || 'None'
-      },
-      theme: {
-        color: '#0284c7', // Brand primary blue color
-      },
-      modal: {
-        ondismiss: () => {
-          setIsProcessing(false);
-        }
-      }
-    };
-
-    try {
-      const rzp = new (window as any).Razorpay(options);
-      
-      // Register event listener for failed payments as requested
-      rzp.on('payment.failed', function (response: any) {
-        setIsProcessing(false);
-        const failDesc = response.error?.description || 'Transaction declined by payment gateway or issuing bank.';
-        setSdkError(`Payment failed: ${failDesc} (Code: ${response.error?.code || 'DECLINED'})`);
-        setFailureReason(failDesc);
-        setTransactionId(response.error?.metadata?.payment_id || `FAIL-${Date.now().toString().slice(-6)}`);
-        setStep('failed');
-
-        import('../services/auditService').then(({ logUserActivity }) => {
-          logUserActivity('checkout_payment_failed', 'payment', planId, {
-            errorDescription: response.error?.description,
-            errorCode: response.error?.code
-          });
-        }).catch(() => {});
-      });
-      
-      rzp.open();
-    } catch (err) {
-      setIsProcessing(false);
-      setFailureReason('Payment gateway initialization failed. Your test keys in .env.local may be inactive or expired on Razorpay.');
-      setStep('failed');
-    }
+          isTrial,
+          couponApplied: appliedDiscount > 0 ? (appliedCouponCode || couponCode) : undefined,
+          discountPct: appliedDiscount > 0 ? appliedDiscount * 100 : undefined
+        });
+      }).catch(() => {});
+    }, 1200);
   };
 
   const generateInvoiceHTML = (): string => {

@@ -742,7 +742,43 @@ class ComplianceService {
 
     records[index] = updatedRecord;
     this.saveStoredRecords(records);
+
+    // Sync decision with real backend service
+    this.syncWithBackend(bidId, status, officerName, remarks, disqualificationReason).catch(() => {});
+
     return updatedRecord;
+  }
+
+  public async syncWithBackend(bidId: string, status: DecisionStatus, officerName: string, remarks: string, disqualificationReason?: string) {
+    try {
+      const res = await fetch('/api/compliance?action=decide', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bidId,
+          decisionStatus: status,
+          officerName,
+          remarks,
+          disqualificationReason
+        })
+      });
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  public async verifyPortalsWithBackend(payload: { pan: string; gstin: string; udyam?: string; companyName: string }) {
+    try {
+      const res = await fetch('/api/compliance?action=verify-portals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch {
+      return null;
+    }
   }
 
   public createCustomSubmission(
@@ -975,6 +1011,15 @@ class ComplianceService {
 
     records.unshift(newRecord);
     this.saveStoredRecords(records);
+
+    // Hit backend portal verification service
+    this.verifyPortalsWithBackend({
+      companyName,
+      pan: panNumber,
+      gstin,
+      udyam: newRecord.extractedData.udyamRegistrationNumber
+    }).catch(() => {});
+
     return newRecord;
   }
 
