@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, AlertTriangle, XCircle, CheckCircle2, FileText,
   Building2, Cpu, Database, Award, Scale, UserCheck, RefreshCw,
-  PlusCircle, Download, ArrowRight, Activity, Clock, UploadCloud
+  PlusCircle, Download, ArrowRight, Activity, Clock, UploadCloud, Trash2
 } from 'lucide-react';
 import { complianceService } from '../services/complianceService';
 import type { BidSubmissionRecord, DecisionStatus, RiskLevel } from '../types/compliance';
@@ -101,6 +101,13 @@ export const ComplianceEngine: React.FC = () => {
     setIsUploading(false);
     toast.success(`Uploaded "${file.name}" with verified SHA-256 hash!`);
     e.target.value = '';
+  };
+
+  const handleRemoveDocument = (docId: string, docName: string) => {
+    if (!currentBid) return;
+    complianceService.removeDocumentFromBid(currentBid.id, docId);
+    loadBids();
+    toast.success(`Removed "${docName}"`);
   };
 
   const handleSimulateFullPipeline = () => {
@@ -409,13 +416,22 @@ export const ComplianceEngine: React.FC = () => {
                     )}
 
                     <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500">
-                      <span className="font-mono">Hash: {doc.docHash}</span>
-                      <button 
-                        onClick={() => toast(`Raw text preview: ${doc.rawTextPreview || 'No text extracted'}`)}
-                        className="text-primary hover:underline font-semibold cursor-pointer"
-                      >
-                        Inspect
-                      </button>
+                      <span className="font-mono truncate max-w-[110px]" title={doc.docHash}>Hash: {doc.docHash}</span>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => toast(`Raw text preview: ${doc.rawTextPreview || 'No text extracted'}`)}
+                          className="text-primary hover:underline font-semibold cursor-pointer"
+                        >
+                          Inspect
+                        </button>
+                        <button 
+                          onClick={() => handleRemoveDocument(doc.id, doc.name)}
+                          className="text-rose-500 hover:text-rose-700 hover:underline font-semibold cursor-pointer flex items-center gap-0.5"
+                          title="Delete document"
+                        >
+                          <Trash2 className="w-3 h-3" /> Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

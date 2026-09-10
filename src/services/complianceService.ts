@@ -1070,6 +1070,35 @@ class ComplianceService {
     return records[index];
   }
 
+  public removeDocumentFromBid(bidId: string, docId: string): BidSubmissionRecord {
+    const records = this.getStoredRecords();
+    const index = records.findIndex(b => b.id === bidId);
+    if (index === -1) throw new Error('Bid not found');
+
+    const docToRemove = records[index].documents.find(d => d.id === docId);
+    const now = new Date().toISOString();
+
+    const newAuditLog: AuditTrailLog = {
+      id: `LOG-DEL-${Date.now()}`,
+      stage: 1,
+      stageName: 'Bid Submission (Input)',
+      timestamp: now,
+      actor: 'AI_DOCUMENT_ENGINE',
+      action: `Removed tender document: ${docToRemove?.name || docId}`,
+      details: `Document removed from active tender session.`,
+      sha256Hash: Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('')
+    };
+
+    records[index] = {
+      ...records[index],
+      documents: records[index].documents.filter(d => d.id !== docId),
+      auditTrail: [...records[index].auditTrail, newAuditLog]
+    };
+
+    this.saveStoredRecords(records);
+    return records[index];
+  }
+
   public resetToDefaults() {
     localStorage.removeItem(STORAGE_KEY);
     return INITIAL_BIDS;
