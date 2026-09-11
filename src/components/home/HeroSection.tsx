@@ -13,7 +13,6 @@ const GLSLHills = lazy(() => import('../ui/glsl-hills').then(m => ({ default: m.
  */
 export function HeroSection() {
   const heroRef = useRef<HTMLDivElement>(null);
-  const logoRef = useRef<HTMLImageElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showHills, setShowHills] = useState(false);
   const heroHeightRef = useRef<number>(0);
@@ -103,17 +102,6 @@ export function HeroSection() {
     };
   }, []);
 
-  // Calculate the logo's animated position
-  // Start: centered in hero, large and white
-  // End: fades out and translates up
-  const logoScale = 1 - scrollProgress * 0.15; // 1 → 0.85
-  const logoOpacity = Math.max(0, 1 - scrollProgress * 1.5); // fades out quickly
-
-  // Smooth easing
-  const eased = scrollProgress < 0.5
-    ? 2 * scrollProgress * scrollProgress
-    : 1 - Math.pow(-2 * scrollProgress + 2, 2) / 2;
-
   return (
     <div ref={heroRef} className="relative overflow-hidden -mt-[81px] min-h-[calc(100dvh+81px)] pt-12 pb-48 sm:pt-[193px] sm:pb-60 lg:pt-[225px] lg:pb-72 flex flex-col justify-center items-center text-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
       {/* GLSL Hills Background */}
@@ -132,44 +120,13 @@ export function HeroSection() {
 
       <div className="relative z-10 w-full px-4 sm:px-8 lg:px-12 flex flex-col items-center">
         <div className="max-w-4xl flex flex-col items-center">
-
-          {/* "Introducing" text */}
-          <p className="text-lg sm:text-2xl lg:text-3xl font-light tracking-[0.3em] sm:tracking-[0.55em] uppercase mb-4 text-slate-300/90 pl-[0.3em] sm:pl-[0.55em]" style={{
-            opacity: 1 - scrollProgress * 1.5,
-            transform: `translateY(${-scrollProgress * 40}px)`,
-          }}>
-            Introducing
-          </p>
-
-          {/* Animated lelam.co logo — fades out and translates up */}
-          <div className="relative mb-6 max-w-[85vw] sm:max-w-none" style={{
-            transform: `scale(${logoScale}) translateY(${-eased * 80}px)`,
-            opacity: logoOpacity,
-            transition: 'transform 0.05s linear, opacity 0.05s linear',
-            transformOrigin: 'center center',
-          }}>
-            <img
-              ref={logoRef}
-              src="/png_lelam_1.webp"
-              alt="Lelam Logo"
-              width={700}
-              height={140}
-              fetchPriority="high"
-              className="w-auto max-h-[80px] sm:max-h-[120px] lg:max-h-[140px] object-contain select-none mx-auto"
-              style={{
-                filter: 'brightness(0) invert(1)',
-              }}
-              draggable={false}
-            />
-          </div>
-
-          {/* Subtitle */}
-          <p className="text-sm sm:text-base md:text-xl lg:text-2xl leading-relaxed mb-10 sm:mb-12 font-light tracking-[0.15em] sm:tracking-[0.35em] uppercase text-center text-slate-200 px-4" style={{
+          {/* Main Title */}
+          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-white mb-8 sm:mb-10 text-center leading-tight uppercase" style={{
             opacity: 1 - scrollProgress * 1.3,
             transform: `translateY(${-scrollProgress * 30}px)`,
           }}>
             Where auctions are mainstream
-          </p>
+          </h1>
 
           {/* CTA */}
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto px-4 sm:px-0" style={{

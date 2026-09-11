@@ -70,7 +70,6 @@ export function TopBar() {
             try {
               new Notification(newNotif.title, {
                 body: newNotif.message,
-                icon: '/png_lelam_1.webp'
               });
             } catch (err) {
               console.warn('System notification failed to trigger:', err);

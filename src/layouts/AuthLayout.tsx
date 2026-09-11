@@ -26,10 +26,6 @@ export function AuthLayout() {
           </div>
 
           <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center">
-            <Link to="/" className="inline-block transition-transform hover:scale-105">
-              <img src="/png_lelam_1.webp" alt="Lelam Logo" width={317} height={64} className="h-14 lg:h-16 w-auto object-contain brightness-0 invert filter drop-shadow-md mb-8" />
-            </Link>
-
             <p className="text-xl lg:text-2xl font-bold text-slate-200 max-w-md leading-relaxed">
               {subtitlePhrase}
             </p>
@@ -57,32 +53,11 @@ export function AuthLayout() {
         {/* Form Column (Right / Center on Mobile & Tablet) */}
         <div className="bg-white flex flex-col justify-center items-center py-8 sm:py-12 px-4 sm:px-6 md:px-10 lg:px-16 min-h-[calc(100vh-60px)] md:min-h-0">
           <div className="w-full max-w-sm sm:max-w-md">
-            {/* Mobile Branding Header */}
-            <div className="md:hidden flex flex-col items-center mb-6">
-              <Link to="/" className="inline-block">
-                <img src="/png_lelam_1.webp" alt="Lelam Logo" width={238} height={48} className="h-10 sm:h-12 w-auto object-contain filter drop-shadow-sm" />
-              </Link>
-            </div>
-
             <Outlet />
           </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-slate-950 text-slate-400 py-4 px-4 sm:px-8 md:px-16 flex flex-col sm:flex-row justify-between items-center text-xs border-t border-slate-900 gap-2.5 z-10">
-        <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-center sm:text-left">
-          <span className="font-medium text-slate-400">&copy; {new Date().getFullYear()} lelam.co All rights reserved.</span>
-          <span className="hidden sm:inline text-slate-700">•</span>
-          <span className="text-[11px] text-slate-500">Not affiliated with MSTC.</span>
-        </div>
-        <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 font-medium text-slate-400">
-          <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-          <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
-          <Link to="/cookies" className="hover:text-white transition-colors">Cookies</Link>
-          <Link to="/support" className="hover:text-white transition-colors">Support</Link>
-        </div>
-      </footer>
       <CookieConsent />
     </div>
   );

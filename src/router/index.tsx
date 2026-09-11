@@ -63,8 +63,6 @@ const ForgotPassword = lazyWithSuspense(() => import('../pages/ForgotPassword').
 const ResetPassword = lazyWithSuspense(() => import('../pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
 const Dashboard = lazyWithSuspense(() => import('../pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Admin = lazyWithSuspense(() => import('../pages/Admin').then(m => ({ default: m.Admin })));
-const Contact = lazyWithSuspense(() => import('../pages/Contact').then(m => ({ default: m.Contact })));
-const About = lazyWithSuspense(() => import('../pages/About').then(m => ({ default: m.About })));
 const Blog = lazyWithSuspense(() => import('../pages/Blog').then(m => ({ default: m.Blog })));
 const BlogDetail = lazyWithSuspense(() => import('../pages/BlogDetail').then(m => ({ default: m.BlogDetail })));
 
@@ -106,8 +104,8 @@ export const router = createBrowserRouter([
       { path: 'auctions', element: <Auctions /> },
       { path: 'compliance', element: <ComplianceEngine /> },
       { path: 'auctions/:id', element: <AuctionDetail /> },
-      { path: 'contact', element: <Contact /> },
-      { path: 'about', element: <About /> },
+      { path: 'contact', element: <Navigate to="/" replace /> },
+      { path: 'about', element: <Navigate to="/" replace /> },
       { path: 'faq', element: <FAQ /> },
       { path: 'notices', element: <Notices /> },
       { path: 'news', element: <News /> },

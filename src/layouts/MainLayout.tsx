@@ -1,6 +1,5 @@
 import { Outlet } from 'react-router-dom';
 import { Header } from '../components/common/Header';
-import { Footer } from '../components/common/Footer';
 import { AnnouncementBanner } from '../components/common/AnnouncementBanner';
 import { PageTracker } from '../components/common/PageTracker';
 import { CookieConsent } from '../components/common/CookieConsent';
@@ -21,7 +20,6 @@ export function MainLayout() {
         <main id="main-content" className="flex-grow pb-16 md:pb-0" role="main">
           <Outlet />
         </main>
-        <Footer />
         <MobileBottomNav />
         <CookieConsent />
       </div>

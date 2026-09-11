@@ -177,7 +177,6 @@ export function Header() {
             try {
               new window.Notification(newNotif.title, {
                 body: newNotif.message,
-                icon: '/png_lelam_1.webp'
               });
             } catch (err) {
               console.warn('Browser system notification failed:', err);
@@ -236,10 +235,6 @@ export function Header() {
   // Decide transparency state
   const isHeaderTransparent = isHomePage && heroMounted && !isScrolled;
 
-  // Logo visibility: hidden when hero logo is visible, appears as hero logo fades
-  const navLogoOpacity = isHeaderTransparent ? 0 : 1;
-  const navLogoSlideY = isHeaderTransparent ? -8 : 0; // slide down 8px
-
   const navigation = [
     { name: 'Home', href: '/' },
     { name: 'Auctions', href: '/auctions' },
@@ -247,8 +242,6 @@ export function Header() {
     { name: 'News', href: '/news' },
     { name: 'Blog', href: '/blog' },
     { name: 'FAQ', href: '/faq' },
-    { name: 'About', href: '/about' },
-    { name: 'Contact', href: '/contact' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -268,19 +261,9 @@ export function Header() {
         />
       </div>
       <div className="w-full px-4 sm:px-8 lg:px-12">
-        <div className="flex justify-between items-center h-20">
-          <div className="flex-shrink-0 flex items-center" style={{
-            opacity: navLogoOpacity,
-            transform: `translateY(${navLogoSlideY}px)`,
-            transition: 'opacity 0.25s ease, transform 0.25s ease',
-          }}>
-            <Link to="/" className="flex items-center gap-2">
-              <img src="/png_lelam_1.webp" alt="Lelam Logo" width={188} height={38} className="w-auto object-contain" style={{ height: '38px' }} />
-            </Link>
-          </div>
-
+        <div className="relative flex justify-center items-center h-20">
           {/* Desktop Navigation */}
-          <nav className="hidden xl:flex space-x-1 lg:space-x-3 items-center" aria-label="Main navigation">
+          <nav className="hidden xl:flex space-x-1 lg:space-x-3 items-center justify-center" aria-label="Main navigation">
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -448,7 +431,7 @@ export function Header() {
           </nav>
 
           {/* Mobile & Tablet actions + menu button */}
-          <div className="flex items-center space-x-2 xl:hidden">
+          <div className="flex items-center space-x-2 xl:hidden absolute right-0">
             {isAuthenticated && (
               <Link
                 to="/dashboard"
@@ -502,13 +485,6 @@ export function Header() {
             className="flex items-center gap-2"
             onClick={() => setIsMobileMenuOpen(false)}
           >
-            <img 
-              src="/png_lelam_1.webp" 
-              alt="Lelam Logo" 
-              width={140} 
-              height={32} 
-              className="h-8 w-auto object-contain" 
-            />
             <span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">
               {planTag}
             </span>

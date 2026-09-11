@@ -67,7 +67,6 @@ export function Sidebar() {
     <div className="flex-1 flex flex-col h-full bg-white">
       <div className="h-16 flex items-center justify-between px-6 border-b border-border shrink-0">
         <Link to="/" className="flex items-center gap-2.5" onClick={() => sidebarOpen && toggleSidebar()}>
-          <img src="/png_lelam_1.webp" alt="Lelam Logo" width={158} height={32} className="h-8 w-auto object-contain" />
         </Link>
         <button onClick={toggleSidebar} className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer" aria-label="Close sidebar">
           <ArrowLeft className="w-5 h-5" />

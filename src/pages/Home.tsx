@@ -8,7 +8,6 @@ const FeaturedAuctionsSection = lazy(() => import('../components/home/FeaturedAu
 const HowItWorksSection = lazy(() => import('../components/home/HowItWorksSection').then(m => ({ default: m.HowItWorksSection })));
 const LatestNewsBlogSection = lazy(() => import('../components/home/LatestNewsBlogSection').then(m => ({ default: m.LatestNewsBlogSection })));
 const FaqSection = lazy(() => import('../components/home/FaqSection').then(m => ({ default: m.FaqSection })));
-const ContactSalesSection = lazy(() => import('../components/home/ContactSalesSection').then(m => ({ default: m.ContactSalesSection })));
 
 // Invisible placeholder — chunks load near-instantly so a visible spinner just flickers annoyingly
 function SectionSkeleton() {
@@ -77,9 +76,6 @@ export function Home() {
           </Suspense>
           <Suspense fallback={<SectionSkeleton />}>
             <LatestNewsBlogSection />
-          </Suspense>
-          <Suspense fallback={<SectionSkeleton />}>
-            <ContactSalesSection />
           </Suspense>
           <Suspense fallback={<SectionSkeleton />}>
             <FaqSection />
