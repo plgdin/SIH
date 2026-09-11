@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Menu, X, Gavel, 
-  HelpCircle, Newspaper, BookOpen, Info, Mail, Home as HomeIcon, Sparkles,
+  HelpCircle, Newspaper, BookOpen, Info, Mail, Home as HomeIcon,
   Bell, CheckCircle2, AlertCircle, LogOut, ChevronDown
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -106,15 +106,6 @@ export function Header() {
        profile?.subscription_plan === 'enterprise' ? 'Enterprise' :
        (profile?.subscription_plan === 'go' || profile?.subscription_plan === 'go-subscription') ? 'Individual' : 'Free')
     : 'App';
-
-  const isPaidSubscriberOrAdmin = isAuthenticated && (
-    profile?.subscription_plan === 'pro' || 
-    profile?.subscription_plan === 'go' || 
-    profile?.subscription_plan === 'go-subscription' || 
-    profile?.subscription_plan === 'enterprise' || 
-    profile?.role === 'admin' || 
-    profile?.role === 'superadmin'
-  );
 
   const [notifications, setNotifications] = useState<DbNotification[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -256,7 +247,6 @@ export function Header() {
     { name: 'News', href: '/news' },
     { name: 'Blog', href: '/blog' },
     { name: 'FAQ', href: '/faq' },
-    { name: 'Pricing', href: '/pricing' },
     { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
   ];
@@ -382,21 +372,12 @@ export function Header() {
                   <div className="w-24 h-10 bg-slate-100/50 animate-pulse rounded-md" />
                 ) : isAuthenticated ? (
                   <div className="flex items-center gap-3">
-                    {isPaidSubscriberOrAdmin ? (
-                      <Link
-                        to="/dashboard"
-                        className="inline-flex items-center justify-center px-5 py-2.5 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-primary hover:bg-primary-700 transition-colors"
-                      >
-                        Dashboard
-                      </Link>
-                    ) : (
-                      <Link
-                        to="/pricing"
-                        className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-blue-300 bg-gradient-to-t from-blue-100 via-blue-200 to-blue-300 text-blue-950 font-black text-base shadow-xs shadow-blue-300/60 hover:from-blue-200 hover:via-blue-300 hover:to-blue-400 transition-all duration-300 scale-100 hover:scale-105"
-                      >
-                        Upgrade Plan
-                      </Link>
-                    )}
+                    <Link
+                      to="/dashboard"
+                      className="inline-flex items-center justify-center px-5 py-2.5 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-primary hover:bg-primary-700 transition-colors"
+                    >
+                      Dashboard
+                    </Link>
                     
                     <div className="relative header-profile-container">
                       <button
@@ -439,14 +420,6 @@ export function Header() {
                               <Gavel size={14} className="text-slate-400" />
                               Dashboard
                             </Link>
-                            <Link
-                              to="/pricing"
-                              onClick={() => setIsProfileOpen(false)}
-                              className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-700 hover:text-slate-955 hover:bg-slate-50 font-semibold text-xs transition-colors"
-                            >
-                              <Sparkles size={14} className="text-slate-400" />
-                              Upgrade / Pricing
-                            </Link>
                             <button
                               onClick={async () => {
                                 setIsProfileOpen(false);
@@ -476,20 +449,12 @@ export function Header() {
 
           {/* Mobile & Tablet actions + menu button */}
           <div className="flex items-center space-x-2 xl:hidden">
-            {isAuthenticated && isPaidSubscriberOrAdmin && (
+            {isAuthenticated && (
               <Link
                 to="/dashboard"
                 className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md shadow-xs text-sm font-bold text-white bg-primary hover:bg-primary-700 transition-colors"
               >
                 Dashboard
-              </Link>
-            )}
-            {isAuthenticated && !isPaidSubscriberOrAdmin && (
-              <Link
-                to="/pricing"
-                className="inline-flex items-center justify-center px-3 py-1.5 rounded-full border border-blue-300 bg-gradient-to-t from-blue-100 via-blue-200 to-blue-300 text-blue-950 font-bold text-xs shadow-2xs hover:from-blue-200 transition-all"
-              >
-                Upgrade
               </Link>
             )}
             {!isAuthenticated && !isLoading && (
@@ -573,7 +538,7 @@ export function Header() {
                   case 'FAQ': return HelpCircle;
                   case 'About': return Info;
                   case 'Contact': return Mail;
-                  default: return Sparkles;
+                  default: return Info;
                 }
               };
               const IconComp = getIcon(item.name);
@@ -620,23 +585,13 @@ export function Header() {
                     <span className="absolute top-3 right-3.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-white"></span>
                   )}
                 </Link>
-                {isPaidSubscriberOrAdmin ? (
-                  <Link
-                    to="/dashboard"
-                    className="flex-1 text-center py-3.5 px-6 rounded-2xl text-base font-bold text-white bg-primary hover:bg-primary/95 shadow-lg shadow-primary/30 transition-all cursor-pointer"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Go to Dashboard
-                  </Link>
-                ) : (
-                  <Link
-                    to="/pricing"
-                    className="flex-1 text-center py-4 px-6 rounded-2xl border border-blue-300 bg-gradient-to-t from-blue-100 via-blue-200 to-blue-300 text-blue-950 font-black text-lg shadow-xs shadow-blue-300/60 hover:from-blue-200 hover:via-blue-300 hover:to-blue-400 transition-all duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Upgrade Plan
-                  </Link>
-                )}
+                <Link
+                  to="/dashboard"
+                  className="flex-1 text-center py-3.5 px-6 rounded-2xl text-base font-bold text-white bg-primary hover:bg-primary/95 shadow-lg shadow-primary/30 transition-all cursor-pointer"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Go to Dashboard
+                </Link>
               </div>
               <button
                 onClick={async () => {

@@ -75,7 +75,6 @@ const AuctionDetail = lazyWithSuspense(() => import('../pages/AuctionDetail').th
 const Privacy = lazyWithSuspense(() => import('../pages/Privacy').then(m => ({ default: m.Privacy })));
 const Terms = lazyWithSuspense(() => import('../pages/Terms').then(m => ({ default: m.Terms })));
 const Cookies = lazyWithSuspense(() => import('../pages/Cookies').then(m => ({ default: m.Cookies })));
-const PricingPage = lazyWithSuspense(() => import('../pages/Pricing').then(m => ({ default: m.PricingPage })));
 const CheckoutPage = lazyWithSuspense(() => import('../pages/Checkout').then(m => ({ default: m.CheckoutPage })));
 
 const SellerDashboard = lazyWithSuspense(() => import('../pages/seller/SellerDashboard').then(m => ({ default: m.SellerDashboard })));
@@ -119,7 +118,7 @@ export const router = createBrowserRouter([
       { path: 'cookies', element: <Cookies /> },
       { path: 'quotes', element: <QuotePage /> },
       { path: 'quote', element: <Navigate to="/quotes" replace /> },
-      { path: 'pricing', element: <PricingPage /> },
+      { path: 'pricing', element: <Navigate to="/" replace /> },
       { path: 'checkout', element: <CheckoutPage /> },
     ],
   },

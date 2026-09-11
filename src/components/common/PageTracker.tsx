@@ -91,10 +91,6 @@ export function PageTracker() {
     } else if (path === '/cookies') {
       title = 'Cookie Policy | Lelam';
       breadcrumbs.push({ name: 'Cookie Policy', item: 'https://www.lelam.co/cookies' });
-    } else if (path === '/pricing') {
-      title = 'Plans & Pricing | Lelam';
-      description = 'Choose a Lelam subscription plan for advanced eAuction analytics, unlimited quotes, and premium bidding tools.';
-      breadcrumbs.push({ name: 'Pricing', item: 'https://www.lelam.co/pricing' });
     } else if (path.startsWith('/checkout')) {
       title = 'Checkout | Lelam';
       description = 'Complete your Lelam subscription purchase securely.';
